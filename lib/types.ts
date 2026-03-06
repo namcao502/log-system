@@ -13,3 +13,12 @@ export interface LogResponse {
 export interface LogRequestBody {
   ticket: string;
 }
+
+export interface HrmLogRequestBody {
+  tickets: string[];
+}
+
+export interface HrmLogResponse {
+  success: boolean;
+  error?: string;
+}

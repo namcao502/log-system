@@ -2,7 +2,7 @@ import LogForm from "@/components/LogForm";
 
 function getFormattedDate(): string {
   const now = new Date();
-  const formatter = new Intl.DateTimeFormat("vi-VN", {
+  const formatter = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     day: "2-digit",
     month: "2-digit",

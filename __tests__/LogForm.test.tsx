@@ -249,28 +249,13 @@ describe("LogForm -- Log happy path", () => {
     await verifySuccessFlow(user);
 
     mockFetch.mockReturnValueOnce(
-      jsonResponse({ success: true, cell: "O15" })
+      jsonResponse({ success: true, cell: "O66" })
     );
 
     await user.click(screen.getByRole("button", { name: /log to tsc/i }));
 
     await waitFor(() =>
-      expect(screen.getByText("Logged at cell O15")).toBeInTheDocument()
-    );
-  });
-
-  it("shows generic success when cell is not returned", async () => {
-    const user = userEvent.setup();
-    render(<LogForm />);
-
-    await verifySuccessFlow(user);
-
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
-
-    await user.click(screen.getByRole("button", { name: /log to tsc/i }));
-
-    await waitFor(() =>
-      expect(screen.getByText("Logged successfully")).toBeInTheDocument()
+      expect(screen.getByText(/Logged "MDP-1234" at cell O66/)).toBeInTheDocument()
     );
   });
 
@@ -281,7 +266,7 @@ describe("LogForm -- Log happy path", () => {
     await verifySuccessFlow(user);
 
     mockFetch.mockReturnValueOnce(
-      jsonResponse({ success: true, cell: "O15" })
+      jsonResponse({ success: true, cell: "O66" })
     );
 
     await user.click(screen.getByRole("button", { name: /log to tsc/i }));
@@ -308,13 +293,13 @@ describe("LogForm -- Log error paths", () => {
     await verifySuccessFlow(user);
 
     mockFetch.mockReturnValueOnce(
-      jsonResponse({ success: false, error: "Row not found" })
+      jsonResponse({ success: false, error: "Browser automation failed" })
     );
 
     await user.click(screen.getByRole("button", { name: /log to tsc/i }));
 
     await waitFor(() =>
-      expect(screen.getByText("Row not found")).toBeInTheDocument()
+      expect(screen.getByText("Browser automation failed")).toBeInTheDocument()
     );
   });
 
@@ -344,9 +329,7 @@ describe("LogForm -- Log error paths", () => {
     await user.click(screen.getByRole("button", { name: /log to tsc/i }));
 
     await waitFor(() =>
-      expect(
-        screen.getByText("Failed to reach SharePoint API")
-      ).toBeInTheDocument()
+      expect(screen.getByText("Failed to write to Excel")).toBeInTheDocument()
     );
   });
 });
@@ -363,7 +346,6 @@ describe("LogForm -- status reset on input change", () => {
     await verifySuccessFlow(user);
     expect(screen.getByText(/Fix login bug/)).toBeInTheDocument();
 
-    // Change input should clear the status
     await typeTicket(user, "MDP-9999");
 
     expect(screen.queryByText(/Fix login bug/)).not.toBeInTheDocument();
@@ -379,7 +361,6 @@ describe("LogForm -- loading states", () => {
     const user = userEvent.setup();
     render(<LogForm />);
 
-    // Make fetch hang (never resolve)
     mockFetch.mockReturnValueOnce(new Promise(() => {}));
 
     await typeTicket(user, "MDP-1234");
@@ -423,6 +404,6 @@ describe("LogForm -- loading states", () => {
 
     await user.click(screen.getByRole("button", { name: /log to tsc/i }));
 
-    expect(screen.getByText("Writing...")).toBeInTheDocument();
+    expect(screen.getByText("Writing to Excel... (browser will open briefly)")).toBeInTheDocument();
   });
 });

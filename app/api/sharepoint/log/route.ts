@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeTicketToExcel } from "@/lib/excel";
-import { LogRequestBody, LogResponse } from "@/lib/types";
+import { writeTicketViaPlaywright } from "@/lib/browser-log";
+import type { LogRequestBody, LogResponse } from "@/lib/types";
 
 const TICKET_PATTERN = /^MDP-\d+$/;
 
@@ -22,22 +22,18 @@ export async function POST(
 
   if (!ticket || !TICKET_PATTERN.test(ticket)) {
     return NextResponse.json(
-      {
-        success: false,
-        error: "Invalid ticket format. Expected MDP-XXXX.",
-      },
+      { success: false, error: "Invalid ticket format. Expected MDP-XXXX." },
       { status: 400 }
     );
   }
 
-  try {
-    const result = await writeTicketToExcel(ticket);
+  const result = await writeTicketViaPlaywright(ticket);
+
+  if (result.success) {
     return NextResponse.json({ success: true, cell: result.cell });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error occurred";
+  } else {
     return NextResponse.json(
-      { success: false, error: message },
+      { success: false, cell: result.cell, error: result.error },
       { status: 500 }
     );
   }
