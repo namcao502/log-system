@@ -35,6 +35,19 @@ import LogForm from "@/components/LogForm";
 
 const mockFetch = jest.fn();
 
+let resolvePendingFetch: (() => void) | null = null;
+
+function pendingFetchResponse() {
+  return new Promise<Response>((resolve) => {
+    resolvePendingFetch = () =>
+      resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: false }),
+      } as Response);
+  });
+}
+
 beforeEach(() => {
   jest.resetAllMocks();
   global.fetch = mockFetch;
@@ -42,6 +55,8 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.restoreAllMocks();
+  resolvePendingFetch?.();
+  resolvePendingFetch = null;
 });
 
 // ---------------------------------------------------------------------------
@@ -458,7 +473,7 @@ describe("LogForm -- loading states", () => {
     const user = userEvent.setup();
     render(<LogForm />);
 
-    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
 
     await typeTicket(user, "MDP-1234");
     await user.click(screen.getByRole("button", { name: /verify/i }));
@@ -470,7 +485,7 @@ describe("LogForm -- loading states", () => {
     const user = userEvent.setup();
     render(<LogForm />);
 
-    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
 
     await typeTicket(user, "MDP-1234");
     await user.click(screen.getByRole("button", { name: /verify/i }));
@@ -484,7 +499,7 @@ describe("LogForm -- loading states", () => {
 
     await verifySuccessFlow(user);
 
-    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
 
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
@@ -497,7 +512,7 @@ describe("LogForm -- loading states", () => {
 
     await verifySuccessFlow(user);
 
-    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
 
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
@@ -508,7 +523,7 @@ describe("LogForm -- loading states", () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await verifySuccessFlow(user);
-    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     expect(screen.getByRole("button", { name: /log hrm/i })).toBeDisabled();
   });
@@ -517,7 +532,7 @@ describe("LogForm -- loading states", () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await verifySuccessFlow(user);
-    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     expect(screen.getByText("Logging to HRM... (browser will open briefly)")).toBeInTheDocument();
   });
@@ -541,10 +556,12 @@ describe("LogForm -- cross-button state isolation", () => {
     await waitFor(() => expect(screen.getByText("HRM error")).toBeInTheDocument());
 
     // Click Log TSC -> HRM status should reset (message gone)
-    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
-    expect(screen.queryByText("HRM error")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText("HRM error")).not.toBeInTheDocument()
+    );
   });
 
   it("resets TSC status when Log HRM is clicked", async () => {
@@ -560,9 +577,11 @@ describe("LogForm -- cross-button state isolation", () => {
     await waitFor(() => expect(screen.getByText("TSC error")).toBeInTheDocument());
 
     // Click Log HRM -> TSC status should reset (message gone)
-    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
 
-    expect(screen.queryByText("TSC error")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText("TSC error")).not.toBeInTheDocument()
+    );
   });
 });
