@@ -10,7 +10,13 @@ type AsyncStatus =
   | { state: "success"; message: string }
   | { state: "error"; message: string };
 
+interface HrmTicketItem {
+  ticket: string;
+  summary: string;
+}
+
 const TICKET_REGEX = /^MDP-\d+$/;
+const MAX_HRM_TICKETS = 5;
 
 function getTodayDateString(): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -40,9 +46,17 @@ export default function LogForm() {
   const [jiraStatus, setJiraStatus] = useState<AsyncStatus>({ state: "idle" });
   const [logStatus, setLogStatus] = useState<AsyncStatus>({ state: "idle" });
   const [hrmStatus, setHrmStatus] = useState<AsyncStatus>({ state: "idle" });
+  const [hrmTickets, setHrmTickets] = useState<HrmTicketItem[]>([]);
 
   const isTicketValid = TICKET_REGEX.test(ticket);
   const { min, max } = getCurrentYearBounds();
+
+  const jiraSummary =
+    jiraStatus.state === "success" ? jiraStatus.message : "";
+  const canAddToHrm =
+    jiraStatus.state === "success" &&
+    hrmTickets.length < MAX_HRM_TICKETS &&
+    !hrmTickets.some((t) => t.ticket === ticket);
 
   const handleTicketChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,6 +98,15 @@ export default function LogForm() {
     }
   }, [ticket, isTicketValid]);
 
+  const handleAddToHrm = useCallback(() => {
+    if (!canAddToHrm) return;
+    setHrmTickets((prev) => [...prev, { ticket, summary: jiraSummary }]);
+  }, [ticket, jiraSummary, canAddToHrm]);
+
+  const handleRemoveFromHrm = useCallback((ticketId: string) => {
+    setHrmTickets((prev) => prev.filter((t) => t.ticket !== ticketId));
+  }, []);
+
   const isLogging = logStatus.state === "loading" || hrmStatus.state === "loading";
 
   const handleLogTsc = useCallback(async () => {
@@ -109,7 +132,7 @@ export default function LogForm() {
   }, [ticket, selectedDate, jiraStatus.state]);
 
   const handleLogHrm = useCallback(async () => {
-    if (jiraStatus.state !== "success") return;
+    if (hrmTickets.length === 0) return;
 
     setHrmStatus({ state: "loading" });
     setLogStatus({ state: "idle" });
@@ -117,18 +140,22 @@ export default function LogForm() {
       const res = await fetch("/api/hrm/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tickets: [ticket], date: selectedDate }),
+        body: JSON.stringify({
+          tickets: hrmTickets.map((t) => t.ticket),
+          date: selectedDate,
+        }),
       });
       const data = (await res.json()) as HrmLogResponse;
       if (data.success) {
-        setHrmStatus({ state: "success", message: `Logged "${ticket}" to HRM timesheet` });
+        const ticketIds = hrmTickets.map((t) => t.ticket).join(", ");
+        setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
       } else {
         setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
       }
     } catch {
       setHrmStatus({ state: "error", message: "Failed to reach HRM" });
     }
-  }, [ticket, selectedDate, jiraStatus.state]);
+  }, [hrmTickets, selectedDate]);
 
   return (
     <div className="space-y-6">
@@ -211,6 +238,33 @@ export default function LogForm() {
         />
       </div>
 
+      {/* HRM ticket list */}
+      {hrmTickets.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-gray-700">
+            HRM Tickets ({hrmTickets.length}/{MAX_HRM_TICKETS}):
+          </p>
+          <ul className="space-y-1">
+            {hrmTickets.map((item) => (
+              <li
+                key={item.ticket}
+                className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 text-sm"
+              >
+                <span className="text-gray-800">{item.ticket}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveFromHrm(item.ticket)}
+                  className="text-red-500 hover:text-red-700 text-xs font-medium"
+                  aria-label={`Remove ${item.ticket}`}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Action buttons */}
       <div className="flex gap-3">
         <button
@@ -224,12 +278,21 @@ export default function LogForm() {
         </button>
         <button
           type="button"
-          disabled={jiraStatus.state !== "success" || isLogging}
+          disabled={!canAddToHrm || isLogging}
+          onClick={handleAddToHrm}
+          className="rounded-md bg-green-600 px-4 py-2.5 text-sm font-medium text-white
+                     hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Add to HRM
+        </button>
+        <button
+          type="button"
+          disabled={hrmTickets.length === 0 || isLogging}
           onClick={handleLogHrm}
           className="flex-1 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
                      hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Log HRM
+          Log HRM ({hrmTickets.length})
         </button>
       </div>
     </div>

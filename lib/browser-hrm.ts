@@ -1,6 +1,7 @@
 import { chromium, type BrowserContext, type Page } from "playwright";
 import path from "path";
 import os from "os";
+import { getTimeSlots, type TimeSlot } from "./time-slots";
 
 const HRM_URL = "https://hrm.nois.vn/timesheet/self-projects";
 const HRM_PROFILE_DIR = path.join(os.homedir(), ".tsc-daily-log-hrm-browser");
@@ -17,26 +18,6 @@ function getDateString(date: Date): string {
   const mm = parts.find((p) => p.type === "month")!.value;
   const yyyy = parts.find((p) => p.type === "year")!.value;
   return `${dd}/${mm}/${yyyy}`;
-}
-
-interface TimeSlot {
-  start: string;
-  end: string;
-}
-
-function getTimeSlots(ticketCount: number, ticketIndex: number): TimeSlot[] {
-  if (ticketCount === 1) {
-    // Single ticket gets both slots (8h total)
-    return [
-      { start: "09:00", end: "12:00" },
-      { start: "13:00", end: "18:00" },
-    ];
-  }
-  // Two tickets: first gets morning, second gets afternoon
-  if (ticketIndex === 0) {
-    return [{ start: "09:00", end: "12:00" }];
-  }
-  return [{ start: "13:00", end: "18:00" }];
 }
 
 async function waitForAngular(page: Page, ms = 1000): Promise<void> {

@@ -20,9 +20,9 @@ export async function POST(
 
   const { tickets, date } = body;
 
-  if (!Array.isArray(tickets) || tickets.length === 0 || tickets.length > 2) {
+  if (!Array.isArray(tickets) || tickets.length === 0 || tickets.length > 5) {
     return NextResponse.json(
-      { success: false, error: "Expected 1 or 2 tickets." },
+      { success: false, error: "Expected 1 to 5 tickets." },
       { status: 400 }
     );
   }

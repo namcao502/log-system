@@ -7,7 +7,7 @@
  * - Verify button disabled when input is empty or invalid format.
  * - Verify button enabled when input matches MDP-XXXX pattern.
  * - Log TSC button disabled until Jira verification succeeds.
- * - Log HRM button disabled until Jira verification succeeds.
+ * - Log HRM button disabled when HRM ticket list is empty.
  * - Verify happy path: fetch returns valid ticket, success status shown.
  * - Verify error path: fetch returns invalid ticket, error status shown.
  * - Verify network error: fetch throws, error message shown.
@@ -22,6 +22,7 @@
  * - Log TSC button disabled while logging is in progress.
  * - Log HRM button disabled while HRM logging is in progress.
  * - Cross-button state isolation: clicking one log button resets the other's status.
+ * - HRM multi-ticket: add to list, remove from list, send all.
  */
 
 import React from "react";
@@ -86,6 +87,22 @@ async function verifySuccessFlow(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() =>
     expect(screen.getByText(/Fix login bug/)).toBeInTheDocument()
   );
+}
+
+async function addTicketToHrm(
+  user: ReturnType<typeof userEvent.setup>,
+  ticketId: string,
+  summary: string
+) {
+  mockFetch.mockReturnValueOnce(
+    jsonResponse({ valid: true, summary })
+  );
+  await typeTicket(user, ticketId);
+  await user.click(screen.getByRole("button", { name: /verify/i }));
+  await waitFor(() =>
+    expect(screen.getByText(new RegExp(summary))).toBeInTheDocument()
+  );
+  await user.click(screen.getByRole("button", { name: /add to hrm/i }));
 }
 
 function getTodayISO(): string {
@@ -186,15 +203,15 @@ describe("LogForm -- Log TSC button disabled states", () => {
 // ---------------------------------------------------------------------------
 
 describe("LogForm -- Log HRM button disabled states", () => {
-  it("is disabled before verification", () => {
+  it("is disabled when HRM ticket list is empty", () => {
     render(<LogForm />);
     expect(screen.getByRole("button", { name: /log hrm/i })).toBeDisabled();
   });
 
-  it("is enabled after successful verification", async () => {
+  it("is enabled after adding a ticket to HRM list", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
-    await verifySuccessFlow(user);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     expect(screen.getByRole("button", { name: /log hrm/i })).toBeEnabled();
   });
 });
@@ -324,7 +341,7 @@ describe("LogForm -- Log TSC happy path", () => {
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     await waitFor(() => {
-      const call = mockFetch.mock.calls.find(([url]) => url === "/api/sharepoint/log");
+      const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/sharepoint/log");
       expect(call).toBeTruthy();
       const body = JSON.parse((call![1] as RequestInit).body as string);
       expect(body).toMatchObject({ ticket: "MDP-1234" });
@@ -387,33 +404,48 @@ describe("LogForm -- Log TSC error paths", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Log HRM fetch -- happy path
+// Log HRM fetch -- happy path (multi-ticket)
 // ---------------------------------------------------------------------------
 
 describe("LogForm -- Log HRM happy path", () => {
   it("shows success message on successful HRM log", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
-    await verifySuccessFlow(user);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
-      expect(screen.getByText(/Logged "MDP-1234" to HRM timesheet/)).toBeInTheDocument()
+      expect(screen.getByText(/Logged MDP-1234 to HRM timesheet/)).toBeInTheDocument()
     );
   });
 
   it("sends POST to /api/hrm/log with tickets array and date in body", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
-    await verifySuccessFlow(user);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() => {
-      const call = mockFetch.mock.calls.find(([url]) => url === "/api/hrm/log");
+      const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/hrm/log");
       expect(call).toBeTruthy();
       const body = JSON.parse((call![1] as RequestInit).body as string);
       expect(body).toMatchObject({ tickets: ["MDP-1234"] });
       expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+  });
+
+  it("sends multiple tickets when multiple are added to HRM list", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-100", "Feature A");
+    await addTicketToHrm(user, "MDP-200", "Feature B");
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+    await waitFor(() => {
+      const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/hrm/log");
+      expect(call).toBeTruthy();
+      const body = JSON.parse((call![1] as RequestInit).body as string);
+      expect(body.tickets).toEqual(["MDP-100", "MDP-200"]);
     });
   });
 });
@@ -426,7 +458,7 @@ describe("LogForm -- Log HRM error paths", () => {
   it("shows error when HRM API returns failure", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
-    await verifySuccessFlow(user);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(
       jsonResponse({ success: false, error: "HRM automation failed" })
     );
@@ -439,7 +471,7 @@ describe("LogForm -- Log HRM error paths", () => {
   it("shows fallback error when success is false and no error message", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
-    await verifySuccessFlow(user);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(jsonResponse({ success: false }));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
@@ -450,12 +482,65 @@ describe("LogForm -- Log HRM error paths", () => {
   it("shows network error when HRM fetch throws", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
-    await verifySuccessFlow(user);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
       expect(screen.getByText("Failed to reach HRM")).toBeInTheDocument()
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HRM multi-ticket list management
+// ---------------------------------------------------------------------------
+
+describe("LogForm -- HRM ticket list", () => {
+  it("adds a verified ticket to the HRM list", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+    expect(screen.getByText("MDP-1234")).toBeInTheDocument();
+    expect(screen.getByText(/HRM Tickets \(1\/5\)/)).toBeInTheDocument();
+  });
+
+  it("removes a ticket from the HRM list", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+    expect(screen.getByText("MDP-1234")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
+    expect(screen.queryByText(/HRM Tickets/)).not.toBeInTheDocument();
+  });
+
+  it("prevents adding duplicate tickets", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+
+    // Try to verify and add the same ticket again
+    mockFetch.mockReturnValueOnce(
+      jsonResponse({ valid: true, summary: "Fix login bug" })
+    );
+    await typeTicket(user, "MDP-1234");
+    await user.click(screen.getByRole("button", { name: /verify/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/Fix login bug/)).toBeInTheDocument()
+    );
+
+    // "Add to HRM" should be disabled since ticket is already in the list
+    expect(screen.getByRole("button", { name: /add to hrm/i })).toBeDisabled();
+  });
+
+  it("shows ticket count in Log HRM button", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    expect(screen.getByRole("button", { name: /log hrm/i })).toHaveTextContent("Log HRM (0)");
+    await addTicketToHrm(user, "MDP-100", "Feature A");
+    expect(screen.getByRole("button", { name: /log hrm/i })).toHaveTextContent("Log HRM (1)");
+    await addTicketToHrm(user, "MDP-200", "Feature B");
+    expect(screen.getByRole("button", { name: /log hrm/i })).toHaveTextContent("Log HRM (2)");
   });
 });
 
@@ -535,7 +620,7 @@ describe("LogForm -- loading states", () => {
   it("disables Log HRM button while HRM logging is in progress", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
-    await verifySuccessFlow(user);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(pendingFetchResponse());
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     expect(screen.getByRole("button", { name: /log hrm/i })).toBeDisabled();
@@ -544,7 +629,7 @@ describe("LogForm -- loading states", () => {
   it("shows Logging to HRM... message during HRM loading", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
-    await verifySuccessFlow(user);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(pendingFetchResponse());
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     expect(screen.getByText("Logging to HRM... (browser will open briefly)")).toBeInTheDocument();
@@ -559,7 +644,7 @@ describe("LogForm -- cross-button state isolation", () => {
   it("resets HRM status when Log TSC is clicked", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
-    await verifySuccessFlow(user);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
     // Log to HRM -> get an error
     mockFetch.mockReturnValueOnce(
@@ -568,7 +653,17 @@ describe("LogForm -- cross-button state isolation", () => {
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() => expect(screen.getByText("HRM error")).toBeInTheDocument());
 
-    // Click Log TSC -> HRM status should reset (message gone)
+    // Need to re-verify for TSC (verify status was set during addTicketToHrm)
+    mockFetch.mockReturnValueOnce(
+      jsonResponse({ valid: true, summary: "Fix login bug" })
+    );
+    await typeTicket(user, "MDP-1234");
+    await user.click(screen.getByRole("button", { name: /verify/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/Fix login bug/)).toBeInTheDocument()
+    );
+
+    // Click Log TSC -> HRM status should reset
     mockFetch.mockReturnValueOnce(pendingFetchResponse());
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
@@ -589,7 +684,8 @@ describe("LogForm -- cross-button state isolation", () => {
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
     await waitFor(() => expect(screen.getByText("TSC error")).toBeInTheDocument());
 
-    // Click Log HRM -> TSC status should reset (message gone)
+    // Add ticket to HRM list and click Log HRM
+    await user.click(screen.getByRole("button", { name: /add to hrm/i }));
     mockFetch.mockReturnValueOnce(pendingFetchResponse());
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
 
@@ -634,7 +730,7 @@ describe("LogForm -- date picker", () => {
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     await waitFor(() => {
-      const call = mockFetch.mock.calls.find(([url]) => url === "/api/sharepoint/log");
+      const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/sharepoint/log");
       expect(call).toBeTruthy();
       const body = JSON.parse((call![1] as RequestInit).body as string);
       expect(body.date).toBe("2026-01-15");
@@ -644,7 +740,7 @@ describe("LogForm -- date picker", () => {
   it("Log HRM sends the selected date", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
-    await verifySuccessFlow(user);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
     fireEvent.change(screen.getByLabelText(/date/i), { target: { value: "2026-01-15" } });
 
@@ -652,7 +748,7 @@ describe("LogForm -- date picker", () => {
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
 
     await waitFor(() => {
-      const call = mockFetch.mock.calls.find(([url]) => url === "/api/hrm/log");
+      const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/hrm/log");
       expect(call).toBeTruthy();
       const body = JSON.parse((call![1] as RequestInit).body as string);
       expect(body.date).toBe("2026-01-15");
