@@ -25,7 +25,7 @@
  */
 
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import LogForm from "@/components/LogForm";
 
@@ -86,6 +86,19 @@ async function verifySuccessFlow(user: ReturnType<typeof userEvent.setup>) {
   await waitFor(() =>
     expect(screen.getByText(/Fix login bug/)).toBeInTheDocument()
   );
+}
+
+function getTodayISO(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((p) => p.type === "year")!.value;
+  const month = parts.find((p) => p.type === "month")!.value;
+  const day = parts.find((p) => p.type === "day")!.value;
+  return `${year}-${month}-${day}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +311,7 @@ describe("LogForm -- Log TSC happy path", () => {
     );
   });
 
-  it("sends POST to /api/sharepoint/log with ticket in body", async () => {
+  it("sends POST to /api/sharepoint/log with ticket and date in body", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
 
@@ -311,11 +324,11 @@ describe("LogForm -- Log TSC happy path", () => {
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith("/api/sharepoint/log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket: "MDP-1234" }),
-      });
+      const call = mockFetch.mock.calls.find(([url]) => url === "/api/sharepoint/log");
+      expect(call).toBeTruthy();
+      const body = JSON.parse((call![1] as RequestInit).body as string);
+      expect(body).toMatchObject({ ticket: "MDP-1234" });
+      expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
   });
 });
@@ -389,18 +402,18 @@ describe("LogForm -- Log HRM happy path", () => {
     );
   });
 
-  it("sends POST to /api/hrm/log with tickets array in body", async () => {
+  it("sends POST to /api/hrm/log with tickets array and date in body", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await verifySuccessFlow(user);
     mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith("/api/hrm/log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tickets: ["MDP-1234"] }),
-      });
+      const call = mockFetch.mock.calls.find(([url]) => url === "/api/hrm/log");
+      expect(call).toBeTruthy();
+      const body = JSON.parse((call![1] as RequestInit).body as string);
+      expect(body).toMatchObject({ tickets: ["MDP-1234"] });
+      expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
   });
 });
@@ -583,5 +596,66 @@ describe("LogForm -- cross-button state isolation", () => {
     await waitFor(() =>
       expect(screen.queryByText("TSC error")).not.toBeInTheDocument()
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Date picker
+// ---------------------------------------------------------------------------
+
+describe("LogForm -- date picker", () => {
+  it("renders date input with today's value on initial render", () => {
+    render(<LogForm />);
+    const dateInput = screen.getByLabelText(/date/i);
+    expect(dateInput).toHaveValue(getTodayISO());
+  });
+
+  it("resets date to today when ticket input changes", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+
+    const dateInput = screen.getByLabelText(/date/i);
+    fireEvent.change(dateInput, { target: { value: "2026-01-15" } });
+    expect(dateInput).toHaveValue("2026-01-15");
+
+    await typeTicket(user, "MDP-9999");
+
+    expect(dateInput).toHaveValue(getTodayISO());
+  });
+
+  it("Log TSC sends the selected date", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+
+    fireEvent.change(screen.getByLabelText(/date/i), { target: { value: "2026-01-15" } });
+
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O15" }));
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
+
+    await waitFor(() => {
+      const call = mockFetch.mock.calls.find(([url]) => url === "/api/sharepoint/log");
+      expect(call).toBeTruthy();
+      const body = JSON.parse((call![1] as RequestInit).body as string);
+      expect(body.date).toBe("2026-01-15");
+    });
+  });
+
+  it("Log HRM sends the selected date", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+
+    fireEvent.change(screen.getByLabelText(/date/i), { target: { value: "2026-01-15" } });
+
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+
+    await waitFor(() => {
+      const call = mockFetch.mock.calls.find(([url]) => url === "/api/hrm/log");
+      expect(call).toBeTruthy();
+      const body = JSON.parse((call![1] as RequestInit).body as string);
+      expect(body.date).toBe("2026-01-15");
+    });
   });
 });

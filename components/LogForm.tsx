@@ -12,17 +12,42 @@ type AsyncStatus =
 
 const TICKET_REGEX = /^MDP-\d+$/;
 
+function getTodayDateString(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  const year = parts.find((p) => p.type === "year")!.value;
+  const month = parts.find((p) => p.type === "month")!.value;
+  const day = parts.find((p) => p.type === "day")!.value;
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentYearBounds(): { min: string; max: string } {
+  const yearStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+  }).format(new Date());
+  return { min: `${yearStr}-01-01`, max: `${yearStr}-12-31` };
+}
+
 export default function LogForm() {
   const [ticket, setTicket] = useState("");
+  const [selectedDate, setSelectedDate] = useState(getTodayDateString);
   const [jiraStatus, setJiraStatus] = useState<AsyncStatus>({ state: "idle" });
   const [logStatus, setLogStatus] = useState<AsyncStatus>({ state: "idle" });
   const [hrmStatus, setHrmStatus] = useState<AsyncStatus>({ state: "idle" });
 
   const isTicketValid = TICKET_REGEX.test(ticket);
+  const { min, max } = getCurrentYearBounds();
 
   const handleTicketChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setTicket(e.target.value.toUpperCase());
+      setSelectedDate(getTodayDateString());
       setJiraStatus({ state: "idle" });
       setLogStatus({ state: "idle" });
       setHrmStatus({ state: "idle" });
@@ -70,7 +95,7 @@ export default function LogForm() {
       const res = await fetch("/api/sharepoint/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket }),
+        body: JSON.stringify({ ticket, date: selectedDate }),
       });
       const data = (await res.json()) as LogResponse;
       if (data.success) {
@@ -81,7 +106,7 @@ export default function LogForm() {
     } catch {
       setLogStatus({ state: "error", message: "Failed to write to Excel" });
     }
-  }, [ticket, jiraStatus.state]);
+  }, [ticket, selectedDate, jiraStatus.state]);
 
   const handleLogHrm = useCallback(async () => {
     if (jiraStatus.state !== "success") return;
@@ -92,7 +117,7 @@ export default function LogForm() {
       const res = await fetch("/api/hrm/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tickets: [ticket] }),
+        body: JSON.stringify({ tickets: [ticket], date: selectedDate }),
       });
       const data = (await res.json()) as HrmLogResponse;
       if (data.success) {
@@ -103,7 +128,7 @@ export default function LogForm() {
     } catch {
       setHrmStatus({ state: "error", message: "Failed to reach HRM" });
     }
-  }, [ticket, jiraStatus.state]);
+  }, [ticket, selectedDate, jiraStatus.state]);
 
   return (
     <div className="space-y-6">
@@ -130,6 +155,23 @@ export default function LogForm() {
         >
           Verify
         </button>
+      </div>
+
+      {/* Date picker */}
+      <div className="flex items-center gap-3">
+        <label htmlFor="log-date" className="text-sm font-medium text-gray-700">
+          Date:
+        </label>
+        <input
+          id="log-date"
+          type="date"
+          value={selectedDate}
+          min={min}
+          max={max}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm
+                     focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
       </div>
 
       {/* Status indicators */}

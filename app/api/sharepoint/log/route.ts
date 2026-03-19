@@ -18,7 +18,7 @@ export async function POST(
     );
   }
 
-  const { ticket } = body;
+  const { ticket, date } = body;
 
   if (!ticket || !TICKET_PATTERN.test(ticket)) {
     return NextResponse.json(
@@ -27,7 +27,8 @@ export async function POST(
     );
   }
 
-  const result = await writeTicketViaPlaywright(ticket);
+  const dateObj = date ? new Date(`${date}T00:00:00`) : undefined;
+  const result = await writeTicketViaPlaywright(ticket, dateObj);
 
   if (result.success) {
     return NextResponse.json({ success: true, cell: result.cell });

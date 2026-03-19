@@ -12,10 +12,12 @@ export interface LogResponse {
 
 export interface LogRequestBody {
   ticket: string;
+  date?: string;
 }
 
 export interface HrmLogRequestBody {
   tickets: string[];
+  date?: string;
 }
 
 export interface HrmLogResponse {

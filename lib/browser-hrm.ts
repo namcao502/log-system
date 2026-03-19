@@ -5,13 +5,17 @@ import os from "os";
 const HRM_URL = "https://hrm.nois.vn/timesheet/self-projects";
 const HRM_PROFILE_DIR = path.join(os.homedir(), ".tsc-daily-log-hrm-browser");
 
-function getTodayString(): string {
-  const now = new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" })
-  );
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const yyyy = now.getFullYear();
+function getDateString(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const dd = parts.find((p) => p.type === "day")!.value;
+  const mm = parts.find((p) => p.type === "month")!.value;
+  const yyyy = parts.find((p) => p.type === "year")!.value;
   return `${dd}/${mm}/${yyyy}`;
 }
 
@@ -305,9 +309,10 @@ async function fillTaskPopup(
 }
 
 export async function logTicketsToHrm(
-  tickets: string[]
+  tickets: string[],
+  date?: Date
 ): Promise<{ success: boolean; error?: string }> {
-  const todayStr = getTodayString();
+  const todayStr = getDateString(date ?? new Date());
   const t0 = Date.now();
   const elapsed = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
 

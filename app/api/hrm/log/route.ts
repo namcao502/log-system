@@ -18,7 +18,7 @@ export async function POST(
     );
   }
 
-  const { tickets } = body;
+  const { tickets, date } = body;
 
   if (!Array.isArray(tickets) || tickets.length === 0 || tickets.length > 2) {
     return NextResponse.json(
@@ -36,7 +36,8 @@ export async function POST(
     }
   }
 
-  const result = await logTicketsToHrm(tickets);
+  const dateObj = date ? new Date(`${date}T00:00:00`) : undefined;
+  const result = await logTicketsToHrm(tickets, dateObj);
 
   if (result.success) {
     return NextResponse.json({ success: true });

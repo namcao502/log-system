@@ -8,16 +8,16 @@ const EXCEL_URL =
 const PLAYWRIGHT_PROFILE_DIR = path.join(os.homedir(), ".tsc-daily-log-browser");
 
 const HEADER_ROWS = 2;
-const TARGET_COLUMN = "O";
+const TARGET_COLUMN = "M";
 
-function getTodayCell(): string {
+function getCellForDate(date: Date): string {
   // Extract date parts in Vietnam timezone using Intl (no fragile string parsing)
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Ho_Chi_Minh",
     year: "numeric",
     month: "numeric",
     day: "numeric",
-  }).formatToParts(new Date());
+  }).formatToParts(date);
 
   const year = Number(parts.find((p) => p.type === "year")!.value);
   const month = Number(parts.find((p) => p.type === "month")!.value);
@@ -111,9 +111,10 @@ async function navigateToCell(
 
 
 export async function writeTicketViaPlaywright(
-  ticket: string
+  ticket: string,
+  date?: Date
 ): Promise<{ success: boolean; cell: string; error?: string }> {
-  const cellAddress = getTodayCell();
+  const cellAddress = getCellForDate(date ?? new Date());
   const t0 = Date.now();
   const elapsed = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
 
