@@ -6,16 +6,22 @@
  * - Input converts typed text to uppercase.
  * - Verify button disabled when input is empty or invalid format.
  * - Verify button enabled when input matches MDP-XXXX pattern.
- * - Log to TSC button disabled until Jira verification succeeds.
+ * - Log TSC button disabled until Jira verification succeeds.
+ * - Log HRM button disabled until Jira verification succeeds.
  * - Verify happy path: fetch returns valid ticket, success status shown.
  * - Verify error path: fetch returns invalid ticket, error status shown.
  * - Verify network error: fetch throws, error message shown.
- * - Log happy path: fetch returns success, cell info shown.
- * - Log error path: fetch returns failure, error message shown.
- * - Log network error: fetch throws, error message shown.
+ * - Log TSC happy path: fetch returns success, cell info shown.
+ * - Log TSC error path: fetch returns failure, error message shown.
+ * - Log TSC network error: fetch throws, error message shown.
+ * - Log HRM happy path: fetch returns success, success message shown.
+ * - Log HRM error path: fetch returns failure, error message shown.
+ * - Log HRM network error: fetch throws, error message shown.
  * - Changing input resets both statuses.
  * - Verify button disabled while loading.
- * - Log button disabled while loading.
+ * - Log TSC button disabled while logging is in progress.
+ * - Log HRM button disabled while HRM logging is in progress.
+ * - Cross-button state isolation: clicking one log button resets the other's status.
  */
 
 import React from "react";
@@ -130,20 +136,38 @@ describe("LogForm -- Verify button disabled states", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Log to TSC button disabled states
+// Log TSC button disabled states
 // ---------------------------------------------------------------------------
 
-describe("LogForm -- Log to TSC button disabled states", () => {
+describe("LogForm -- Log TSC button disabled states", () => {
   it("is disabled before verification", () => {
     render(<LogForm />);
-    expect(screen.getByRole("button", { name: /log to tsc/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /log tsc/i })).toBeDisabled();
   });
 
   it("is enabled after successful verification", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await verifySuccessFlow(user);
-    expect(screen.getByRole("button", { name: /log to tsc/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /log tsc/i })).toBeEnabled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Log HRM button disabled states
+// ---------------------------------------------------------------------------
+
+describe("LogForm -- Log HRM button disabled states", () => {
+  it("is disabled before verification", () => {
+    render(<LogForm />);
+    expect(screen.getByRole("button", { name: /log hrm/i })).toBeDisabled();
+  });
+
+  it("is enabled after successful verification", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+    expect(screen.getByRole("button", { name: /log hrm/i })).toBeEnabled();
   });
 });
 
@@ -238,10 +262,10 @@ describe("LogForm -- Verify error paths", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Log fetch -- happy path
+// Log TSC fetch -- happy path
 // ---------------------------------------------------------------------------
 
-describe("LogForm -- Log happy path", () => {
+describe("LogForm -- Log TSC happy path", () => {
   it("shows cell info on successful log", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
@@ -252,7 +276,7 @@ describe("LogForm -- Log happy path", () => {
       jsonResponse({ success: true, cell: "O66" })
     );
 
-    await user.click(screen.getByRole("button", { name: /log to tsc/i }));
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     await waitFor(() =>
       expect(screen.getByText(/Logged "MDP-1234" at cell O66/)).toBeInTheDocument()
@@ -269,7 +293,7 @@ describe("LogForm -- Log happy path", () => {
       jsonResponse({ success: true, cell: "O66" })
     );
 
-    await user.click(screen.getByRole("button", { name: /log to tsc/i }));
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith("/api/sharepoint/log", {
@@ -282,10 +306,10 @@ describe("LogForm -- Log happy path", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Log fetch -- error paths
+// Log TSC fetch -- error paths
 // ---------------------------------------------------------------------------
 
-describe("LogForm -- Log error paths", () => {
+describe("LogForm -- Log TSC error paths", () => {
   it("shows error when log API returns failure", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
@@ -296,7 +320,7 @@ describe("LogForm -- Log error paths", () => {
       jsonResponse({ success: false, error: "Browser automation failed" })
     );
 
-    await user.click(screen.getByRole("button", { name: /log to tsc/i }));
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     await waitFor(() =>
       expect(screen.getByText("Browser automation failed")).toBeInTheDocument()
@@ -311,7 +335,7 @@ describe("LogForm -- Log error paths", () => {
 
     mockFetch.mockReturnValueOnce(jsonResponse({ success: false }));
 
-    await user.click(screen.getByRole("button", { name: /log to tsc/i }));
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     await waitFor(() =>
       expect(screen.getByText("Failed to log")).toBeInTheDocument()
@@ -326,10 +350,83 @@ describe("LogForm -- Log error paths", () => {
 
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
-    await user.click(screen.getByRole("button", { name: /log to tsc/i }));
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     await waitFor(() =>
       expect(screen.getByText("Failed to write to Excel")).toBeInTheDocument()
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Log HRM fetch -- happy path
+// ---------------------------------------------------------------------------
+
+describe("LogForm -- Log HRM happy path", () => {
+  it("shows success message on successful HRM log", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/Logged "MDP-1234" to HRM timesheet/)).toBeInTheDocument()
+    );
+  });
+
+  it("sends POST to /api/hrm/log with tickets array in body", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith("/api/hrm/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tickets: ["MDP-1234"] }),
+      });
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Log HRM fetch -- error paths
+// ---------------------------------------------------------------------------
+
+describe("LogForm -- Log HRM error paths", () => {
+  it("shows error when HRM API returns failure", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+    mockFetch.mockReturnValueOnce(
+      jsonResponse({ success: false, error: "HRM automation failed" })
+    );
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+    await waitFor(() =>
+      expect(screen.getByText("HRM automation failed")).toBeInTheDocument()
+    );
+  });
+
+  it("shows fallback error when success is false and no error message", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: false }));
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+    await waitFor(() =>
+      expect(screen.getByText("Failed to log to HRM")).toBeInTheDocument()
+    );
+  });
+
+  it("shows network error when HRM fetch throws", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+    await waitFor(() =>
+      expect(screen.getByText("Failed to reach HRM")).toBeInTheDocument()
     );
   });
 });
@@ -381,7 +478,7 @@ describe("LogForm -- loading states", () => {
     expect(screen.getByText("Verifying...")).toBeInTheDocument();
   });
 
-  it("disables Log to TSC button while logging is in progress", async () => {
+  it("disables Log TSC button while logging is in progress", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
 
@@ -389,9 +486,9 @@ describe("LogForm -- loading states", () => {
 
     mockFetch.mockReturnValueOnce(new Promise(() => {}));
 
-    await user.click(screen.getByRole("button", { name: /log to tsc/i }));
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
-    expect(screen.getByRole("button", { name: /log to tsc/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /log tsc/i })).toBeDisabled();
   });
 
   it("shows Writing... message during log loading", async () => {
@@ -402,8 +499,70 @@ describe("LogForm -- loading states", () => {
 
     mockFetch.mockReturnValueOnce(new Promise(() => {}));
 
-    await user.click(screen.getByRole("button", { name: /log to tsc/i }));
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     expect(screen.getByText("Writing to Excel... (browser will open briefly)")).toBeInTheDocument();
+  });
+
+  it("disables Log HRM button while HRM logging is in progress", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+    expect(screen.getByRole("button", { name: /log hrm/i })).toBeDisabled();
+  });
+
+  it("shows Logging to HRM... message during HRM loading", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+    expect(screen.getByText("Logging to HRM... (browser will open briefly)")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-button state isolation
+// ---------------------------------------------------------------------------
+
+describe("LogForm -- cross-button state isolation", () => {
+  it("resets HRM status when Log TSC is clicked", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+
+    // Log to HRM -> get an error
+    mockFetch.mockReturnValueOnce(
+      jsonResponse({ success: false, error: "HRM error" })
+    );
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+    await waitFor(() => expect(screen.getByText("HRM error")).toBeInTheDocument());
+
+    // Click Log TSC -> HRM status should reset (message gone)
+    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
+
+    expect(screen.queryByText("HRM error")).not.toBeInTheDocument();
+  });
+
+  it("resets TSC status when Log HRM is clicked", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+
+    // Log to TSC -> get an error
+    mockFetch.mockReturnValueOnce(
+      jsonResponse({ success: false, error: "TSC error" })
+    );
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
+    await waitFor(() => expect(screen.getByText("TSC error")).toBeInTheDocument());
+
+    // Click Log HRM -> TSC status should reset (message gone)
+    mockFetch.mockReturnValueOnce(new Promise(() => {}));
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+
+    expect(screen.queryByText("TSC error")).not.toBeInTheDocument();
   });
 });
