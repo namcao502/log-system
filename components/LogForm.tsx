@@ -35,6 +35,7 @@ export default function LogForm() {
 
     setJiraStatus({ state: "loading" });
     setLogStatus({ state: "idle" });
+    setHrmStatus({ state: "idle" });
 
     try {
       const res = await fetch(
@@ -60,10 +61,11 @@ export default function LogForm() {
 
   const isLogging = logStatus.state === "loading" || hrmStatus.state === "loading";
 
-  const handleTestTsc = useCallback(async () => {
-    if (!isTicketValid) return;
+  const handleLogTsc = useCallback(async () => {
+    if (jiraStatus.state !== "success") return;
 
     setLogStatus({ state: "loading" });
+    setHrmStatus({ state: "idle" });
     try {
       const res = await fetch("/api/sharepoint/log", {
         method: "POST",
@@ -79,55 +81,26 @@ export default function LogForm() {
     } catch {
       setLogStatus({ state: "error", message: "Failed to write to Excel" });
     }
-  }, [ticket, isTicketValid]);
+  }, [ticket, jiraStatus.state]);
 
-  const handleLogAll = useCallback(async () => {
+  const handleLogHrm = useCallback(async () => {
     if (jiraStatus.state !== "success") return;
 
-    setLogStatus({ state: "loading" });
     setHrmStatus({ state: "loading" });
-
-    // Run TSC and HRM logs in parallel
-    const [tscResult, hrmResult] = await Promise.allSettled([
-      (async () => {
-        const res = await fetch("/api/sharepoint/log", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ticket }),
-        });
-        return (await res.json()) as LogResponse;
-      })(),
-      (async () => {
-        const res = await fetch("/api/hrm/log", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tickets: [ticket] }),
-        });
-        return (await res.json()) as HrmLogResponse;
-      })(),
-    ]);
-
-    // Handle TSC result
-    if (tscResult.status === "fulfilled") {
-      const data = tscResult.value;
-      if (data.success) {
-        setLogStatus({ state: "success", message: `Logged "${ticket}" at cell ${data.cell ?? "O"}` });
-      } else {
-        setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
-      }
-    } else {
-      setLogStatus({ state: "error", message: "Failed to write to Excel" });
-    }
-
-    // Handle HRM result
-    if (hrmResult.status === "fulfilled") {
-      const data = hrmResult.value;
+    setLogStatus({ state: "idle" });
+    try {
+      const res = await fetch("/api/hrm/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tickets: [ticket] }),
+      });
+      const data = (await res.json()) as HrmLogResponse;
       if (data.success) {
         setHrmStatus({ state: "success", message: `Logged "${ticket}" to HRM timesheet` });
       } else {
         setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
       }
-    } else {
+    } catch {
       setHrmStatus({ state: "error", message: "Failed to reach HRM" });
     }
   }, [ticket, jiraStatus.state]);
@@ -200,21 +173,21 @@ export default function LogForm() {
       <div className="flex gap-3">
         <button
           type="button"
-          disabled={!isTicketValid || isLogging}
-          onClick={handleTestTsc}
-          className="rounded-md border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700
-                     hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={jiraStatus.state !== "success" || isLogging}
+          onClick={handleLogTsc}
+          className="flex-1 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
+                     hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Test TSC
+          Log TSC
         </button>
         <button
           type="button"
           disabled={jiraStatus.state !== "success" || isLogging}
-          onClick={handleLogAll}
+          onClick={handleLogHrm}
           className="flex-1 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
                      hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Log
+          Log HRM
         </button>
       </div>
     </div>
