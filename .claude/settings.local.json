@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:dev.azure.com)",
+      "WebFetch(domain:newoceaninfosys.atlassian.net)",
+      "Bash(git show:*)",
+      "Bash(dotnet build:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(done)",
+      "Bash(find:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(dotnet test tests/Services/Portal/Portal.UnitTests/Portal.UnitTests.csproj --no-build)",
+      "Bash(dotnet test tests/Services/Portal/Portal.UnitTests/Portal.UnitTests.csproj)",
+      "Bash(curl*:*)",
+      "Bash(git push*:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(claude --version)",
+      "Bash(python -m scripts.aggregate_benchmark \"../implement-workspace/iteration-1\" --skill-name \"implement\")",
+      "Bash(python eval-viewer/generate_review.py \"../implement-workspace/iteration-1\" --skill-name \"implement\" --benchmark \"../implement-workspace/iteration-1/benchmark.json\" --static \"../implement-workspace/iteration-1/review.html\")",
+      "Bash(npm run:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm install:*)",
+      "Bash(node:*)",
+      "Bash(npx jest:*)",
+      "Bash(npm test:*)"
+    ]
+  }
+}
