@@ -110,10 +110,9 @@ export default function LogForm() {
   const isLogging = logStatus.state === "loading" || hrmStatus.state === "loading";
 
   const handleLogTsc = useCallback(async () => {
-    if (jiraStatus.state !== "success") return;
+    if (jiraStatus.state !== "success" || isLogging) return;
 
     setLogStatus({ state: "loading" });
-    setHrmStatus({ state: "idle" });
     try {
       const res = await fetch("/api/sharepoint/log", {
         method: "POST",
@@ -129,13 +128,12 @@ export default function LogForm() {
     } catch {
       setLogStatus({ state: "error", message: "Failed to write to Excel" });
     }
-  }, [ticket, selectedDate, jiraStatus.state]);
+  }, [ticket, selectedDate, jiraStatus.state, logStatus.state, hrmStatus.state]);
 
   const handleLogHrm = useCallback(async () => {
-    if (hrmTickets.length === 0) return;
+    if (hrmTickets.length === 0 || isLogging) return;
 
     setHrmStatus({ state: "loading" });
-    setLogStatus({ state: "idle" });
     try {
       const res = await fetch("/api/hrm/log", {
         method: "POST",
@@ -155,7 +153,7 @@ export default function LogForm() {
     } catch {
       setHrmStatus({ state: "error", message: "Failed to reach HRM" });
     }
-  }, [hrmTickets, selectedDate]);
+  }, [hrmTickets, selectedDate, logStatus.state, hrmStatus.state]);
 
   return (
     <div className="space-y-6">
