@@ -22,6 +22,10 @@
  * - Log TSC button disabled while logging is in progress.
  * - Log HRM button disabled while HRM logging is in progress.
  * - HRM multi-ticket: add to list, remove from list, send all.
+ * - Log All: disabled when Jira not verified or HRM list empty or in-flight.
+ * - Log All: fires both fetches in parallel, statuses update independently.
+ * - Log All: both success, partial failure (TSC only, HRM only).
+ * - Log All: input change resets both statuses after completion.
  */
 
 import React from "react";
@@ -693,5 +697,164 @@ describe("LogForm -- date picker", () => {
       const body = JSON.parse((call![1] as RequestInit).body as string);
       expect(body.date).toBe("2026-01-15");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Log All button disabled states
+// ---------------------------------------------------------------------------
+
+describe("LogForm -- Log All button disabled states", () => {
+  it("is disabled before Jira verification", () => {
+    render(<LogForm />);
+    expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
+  });
+
+  it("is disabled when Jira is verified but HRM ticket list is empty", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await verifySuccessFlow(user);
+    expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
+  });
+
+  it("is disabled when HRM has tickets but Jira is not verified", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+    // Clear the current ticket to lose jira verification
+    await typeTicket(user, "MDP-9999");
+    expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
+  });
+
+  it("is enabled when Jira is verified AND HRM list has tickets", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+    // addTicketToHrm leaves jiraStatus as success for current ticket
+    expect(screen.getByRole("button", { name: /log all/i })).toBeEnabled();
+  });
+
+  it("is disabled while TSC log is in-flight", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
+    await user.click(screen.getByRole("button", { name: /log all/i }));
+
+    expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
+  });
+
+  it("is disabled while HRM log is in-flight", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
+    await user.click(screen.getByRole("button", { name: /log all/i }));
+
+    expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Log All — parallel execution
+// ---------------------------------------------------------------------------
+
+describe("LogForm -- Log All parallel execution", () => {
+  it("sets both logStatus and hrmStatus to loading before any fetch resolves", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
+    mockFetch.mockReturnValueOnce(pendingFetchResponse());
+    await user.click(screen.getByRole("button", { name: /log all/i }));
+
+    expect(screen.getByText("Writing to Excel... (browser will open briefly)")).toBeInTheDocument();
+    expect(screen.getByText("Logging to HRM... (browser will open briefly)")).toBeInTheDocument();
+  });
+
+  it("fires both /api/sharepoint/log and /api/hrm/log when clicked", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O66" }));
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    await user.click(screen.getByRole("button", { name: /log all/i }));
+
+    await waitFor(() => {
+      const urls = mockFetch.mock.calls.map(([url]: [string]) => url);
+      expect(urls).toContain("/api/sharepoint/log");
+      expect(urls).toContain("/api/hrm/log");
+    });
+  });
+
+  it("shows success on both status indicators when both operations succeed", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O66" }));
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    await user.click(screen.getByRole("button", { name: /log all/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Logged "MDP-1234" at cell O66/)).toBeInTheDocument();
+      expect(screen.getByText(/Logged MDP-1234 to HRM timesheet/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows TSC success independently when HRM fails", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O66" }));
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: false, error: "HRM error" }));
+    await user.click(screen.getByRole("button", { name: /log all/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Logged "MDP-1234" at cell O66/)).toBeInTheDocument();
+      expect(screen.getByText("HRM error")).toBeInTheDocument();
+    });
+  });
+
+  it("shows HRM success independently when TSC fails", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: false, error: "TSC error" }));
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    await user.click(screen.getByRole("button", { name: /log all/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("TSC error")).toBeInTheDocument();
+      expect(screen.getByText(/Logged MDP-1234 to HRM timesheet/)).toBeInTheDocument();
+    });
+  });
+
+  it("resets both statuses to idle when ticket input changes after Log All", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
+
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O66" }));
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    await user.click(screen.getByRole("button", { name: /log all/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Logged "MDP-1234" at cell O66/)).toBeInTheDocument()
+    );
+
+    // Type a new ticket — both statuses should reset
+    await typeTicket(user, "MDP-9999");
+
+    expect(screen.queryByText(/Logged "MDP-1234"/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Logged MDP-1234 to HRM/)).not.toBeInTheDocument();
   });
 });

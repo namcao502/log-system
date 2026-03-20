@@ -155,6 +155,51 @@ export default function LogForm() {
     }
   }, [hrmTickets, selectedDate, logStatus.state, hrmStatus.state]);
 
+  const handleLogAll = useCallback(async () => {
+    if (jiraStatus.state !== "success" || hrmTickets.length === 0 || isLogging) return;
+
+    setLogStatus({ state: "loading" });
+    setHrmStatus({ state: "loading" });
+
+    await Promise.all([
+      (async () => {
+        try {
+          const res = await fetch("/api/sharepoint/log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ticket, date: selectedDate }),
+          });
+          const data = (await res.json()) as LogResponse;
+          if (data.success) {
+            setLogStatus({ state: "success", message: `Logged "${ticket}" at cell ${data.cell ?? "O"}` });
+          } else {
+            setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
+          }
+        } catch {
+          setLogStatus({ state: "error", message: "Failed to write to Excel" });
+        }
+      })(),
+      (async () => {
+        try {
+          const res = await fetch("/api/hrm/log", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tickets: hrmTickets.map((t) => t.ticket), date: selectedDate }),
+          });
+          const data = (await res.json()) as HrmLogResponse;
+          if (data.success) {
+            const ticketIds = hrmTickets.map((t) => t.ticket).join(", ");
+            setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
+          } else {
+            setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
+          }
+        } catch {
+          setHrmStatus({ state: "error", message: "Failed to reach HRM" });
+        }
+      })(),
+    ]);
+  }, [ticket, selectedDate, jiraStatus.state, hrmTickets, logStatus.state, hrmStatus.state]);
+
   return (
     <div className="space-y-6">
       {/* Ticket input + Verify */}
@@ -264,33 +309,44 @@ export default function LogForm() {
       )}
 
       {/* Action buttons */}
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3">
         <button
           type="button"
           disabled={jiraStatus.state !== "success" || isLogging}
           onClick={handleLogTsc}
-          className="flex-1 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
+          className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
                      hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Log TSC
         </button>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            disabled={!canAddToHrm || isLogging}
+            onClick={handleAddToHrm}
+            className="flex-1 rounded-md bg-green-600 px-4 py-2.5 text-sm font-medium text-white
+                       hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Add to HRM
+          </button>
+          <button
+            type="button"
+            disabled={hrmTickets.length === 0 || isLogging}
+            onClick={handleLogHrm}
+            className="flex-1 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
+                       hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Log HRM ({hrmTickets.length})
+          </button>
+        </div>
         <button
           type="button"
-          disabled={!canAddToHrm || isLogging}
-          onClick={handleAddToHrm}
-          className="rounded-md bg-green-600 px-4 py-2.5 text-sm font-medium text-white
-                     hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={jiraStatus.state !== "success" || hrmTickets.length === 0 || isLogging}
+          onClick={handleLogAll}
+          className="w-full rounded-md bg-purple-600 px-4 py-2.5 text-sm font-medium text-white
+                     hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Add to HRM
-        </button>
-        <button
-          type="button"
-          disabled={hrmTickets.length === 0 || isLogging}
-          onClick={handleLogHrm}
-          className="flex-1 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
-                     hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Log HRM ({hrmTickets.length})
+          Log All (TSC + HRM)
         </button>
       </div>
     </div>
