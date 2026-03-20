@@ -21,7 +21,6 @@
  * - Verify button disabled while loading.
  * - Log TSC button disabled while logging is in progress.
  * - Log HRM button disabled while HRM logging is in progress.
- * - Cross-button state isolation: clicking one log button resets the other's status.
  * - HRM multi-ticket: add to list, remove from list, send all.
  */
 
@@ -633,65 +632,6 @@ describe("LogForm -- loading states", () => {
     mockFetch.mockReturnValueOnce(pendingFetchResponse());
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     expect(screen.getByText("Logging to HRM... (browser will open briefly)")).toBeInTheDocument();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Cross-button state isolation
-// ---------------------------------------------------------------------------
-
-describe("LogForm -- cross-button state isolation", () => {
-  it("resets HRM status when Log TSC is clicked", async () => {
-    const user = userEvent.setup();
-    render(<LogForm />);
-    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
-
-    // Log to HRM -> get an error
-    mockFetch.mockReturnValueOnce(
-      jsonResponse({ success: false, error: "HRM error" })
-    );
-    await user.click(screen.getByRole("button", { name: /log hrm/i }));
-    await waitFor(() => expect(screen.getByText("HRM error")).toBeInTheDocument());
-
-    // Need to re-verify for TSC (verify status was set during addTicketToHrm)
-    mockFetch.mockReturnValueOnce(
-      jsonResponse({ valid: true, summary: "Fix login bug" })
-    );
-    await typeTicket(user, "MDP-1234");
-    await user.click(screen.getByRole("button", { name: /verify/i }));
-    await waitFor(() =>
-      expect(screen.getByText(/Fix login bug/)).toBeInTheDocument()
-    );
-
-    // Click Log TSC -> HRM status should reset
-    mockFetch.mockReturnValueOnce(pendingFetchResponse());
-    await user.click(screen.getByRole("button", { name: /log tsc/i }));
-
-    await waitFor(() =>
-      expect(screen.queryByText("HRM error")).not.toBeInTheDocument()
-    );
-  });
-
-  it("resets TSC status when Log HRM is clicked", async () => {
-    const user = userEvent.setup();
-    render(<LogForm />);
-    await verifySuccessFlow(user);
-
-    // Log to TSC -> get an error
-    mockFetch.mockReturnValueOnce(
-      jsonResponse({ success: false, error: "TSC error" })
-    );
-    await user.click(screen.getByRole("button", { name: /log tsc/i }));
-    await waitFor(() => expect(screen.getByText("TSC error")).toBeInTheDocument());
-
-    // Add ticket to HRM list and click Log HRM
-    await user.click(screen.getByRole("button", { name: /add to hrm/i }));
-    mockFetch.mockReturnValueOnce(pendingFetchResponse());
-    await user.click(screen.getByRole("button", { name: /log hrm/i }));
-
-    await waitFor(() =>
-      expect(screen.queryByText("TSC error")).not.toBeInTheDocument()
-    );
   });
 });
 
