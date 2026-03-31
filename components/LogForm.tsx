@@ -15,8 +15,13 @@ interface HrmTicketItem {
   summary: string;
 }
 
-const TICKET_REGEX = /^MDP-\d+$/;
+const SINGLE_TICKET_REGEX = /^MDP-\d+$/;
+const INPUT_REGEX = /^MDP-\d+(,\s*MDP-\d+)*$/;
 const MAX_HRM_TICKETS = 5;
+
+function parseTickets(input: string): string[] {
+  return input.split(/,\s*/).filter((t) => SINGLE_TICKET_REGEX.test(t));
+}
 
 function getTodayDateString(): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -42,32 +47,44 @@ function getCurrentYearBounds(): { min: string; max: string } {
 
 export default function LogForm() {
   const [ticket, setTicket] = useState("");
-  const [selectedDate, setSelectedDate] = useState(getTodayDateString);
+  const [stagingDate, setStagingDate] = useState(getTodayDateString);
+  const [logDates, setLogDates] = useState<string[]>(() => [getTodayDateString()]);
   const [jiraStatus, setJiraStatus] = useState<AsyncStatus>({ state: "idle" });
   const [logStatus, setLogStatus] = useState<AsyncStatus>({ state: "idle" });
   const [hrmStatus, setHrmStatus] = useState<AsyncStatus>({ state: "idle" });
   const [hrmTickets, setHrmTickets] = useState<HrmTicketItem[]>([]);
+  const [verifiedTickets, setVerifiedTickets] = useState<HrmTicketItem[]>([]);
 
-  const isTicketValid = TICKET_REGEX.test(ticket);
+  const isTicketValid = INPUT_REGEX.test(ticket.trim());
   const { min, max } = getCurrentYearBounds();
 
-  const jiraSummary =
-    jiraStatus.state === "success" ? jiraStatus.message : "";
+  const newTickets = verifiedTickets.filter(
+    (v) => !hrmTickets.some((h) => h.ticket === v.ticket)
+  );
   const canAddToHrm =
     jiraStatus.state === "success" &&
-    hrmTickets.length < MAX_HRM_TICKETS &&
-    !hrmTickets.some((t) => t.ticket === ticket);
+    newTickets.length > 0 &&
+    hrmTickets.length + newTickets.length <= MAX_HRM_TICKETS;
 
   const handleTicketChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setTicket(e.target.value.toUpperCase());
-      setSelectedDate(getTodayDateString());
       setJiraStatus({ state: "idle" });
       setLogStatus({ state: "idle" });
       setHrmStatus({ state: "idle" });
+      setVerifiedTickets([]);
     },
     []
   );
+
+  const handleAddDate = useCallback(() => {
+    if (!stagingDate || logDates.includes(stagingDate)) return;
+    setLogDates((prev) => [...prev, stagingDate]);
+  }, [stagingDate, logDates]);
+
+  const handleRemoveDate = useCallback((date: string) => {
+    setLogDates((prev) => prev.filter((d) => d !== date));
+  }, []);
 
   const handleVerify = useCallback(async () => {
     if (!isTicketValid) return;
@@ -75,24 +92,37 @@ export default function LogForm() {
     setJiraStatus({ state: "loading" });
     setLogStatus({ state: "idle" });
     setHrmStatus({ state: "idle" });
+    setVerifiedTickets([]);
+
+    const tickets = parseTickets(ticket);
 
     try {
-      const res = await fetch(
-        `/api/jira/verify?ticket=${encodeURIComponent(ticket)}`
+      const results = await Promise.all(
+        tickets.map(async (t) => {
+          const res = await fetch(`/api/jira/verify?ticket=${encodeURIComponent(t)}`);
+          const data: JiraVerifyResponse = await res.json();
+          return { ticket: t, data };
+        })
       );
-      const data: JiraVerifyResponse = await res.json();
 
-      if (data.valid) {
-        setJiraStatus({
-          state: "success",
-          message: `${ticket} — ${data.summary ?? "No summary"}`,
-        });
-      } else {
+      const invalid = results.filter((r) => !r.data.valid);
+      if (invalid.length > 0) {
         setJiraStatus({
           state: "error",
-          message: data.error ?? "Ticket not found",
+          message: `Invalid: ${invalid.map((r) => r.ticket).join(", ")}`,
         });
+        return;
       }
+
+      const verified: HrmTicketItem[] = results.map((r) => ({
+        ticket: r.ticket,
+        summary: `${r.ticket} — ${r.data.summary ?? "No summary"}`,
+      }));
+      setVerifiedTickets(verified);
+      setJiraStatus({
+        state: "success",
+        message: verified.map((v) => v.summary).join(" | "),
+      });
     } catch {
       setJiraStatus({ state: "error", message: "Failed to reach Jira API" });
     }
@@ -100,8 +130,8 @@ export default function LogForm() {
 
   const handleAddToHrm = useCallback(() => {
     if (!canAddToHrm) return;
-    setHrmTickets((prev) => [...prev, { ticket, summary: jiraSummary }]);
-  }, [ticket, jiraSummary, canAddToHrm]);
+    setHrmTickets((prev) => [...prev, ...newTickets]);
+  }, [newTickets, canAddToHrm]);
 
   const handleRemoveFromHrm = useCallback((ticketId: string) => {
     setHrmTickets((prev) => prev.filter((t) => t.ticket !== ticketId));
@@ -112,23 +142,27 @@ export default function LogForm() {
   const handleLogTsc = useCallback(async () => {
     if (jiraStatus.state !== "success" || isLogging) return;
 
+    const tscTicket = hrmTickets.length > 0
+      ? hrmTickets.map((t) => t.ticket).join(", ")
+      : ticket;
+
     setLogStatus({ state: "loading" });
     try {
       const res = await fetch("/api/sharepoint/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket, date: selectedDate }),
+        body: JSON.stringify({ ticket: tscTicket, dates: logDates }),
       });
       const data = (await res.json()) as LogResponse;
       if (data.success) {
-        setLogStatus({ state: "success", message: `Logged "${ticket}" at cell ${data.cell ?? "O"}` });
+        setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${data.cell ?? "O"}` });
       } else {
         setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
       }
     } catch {
       setLogStatus({ state: "error", message: "Failed to write to Excel" });
     }
-  }, [ticket, selectedDate, jiraStatus.state, logStatus.state, hrmStatus.state]);
+  }, [ticket, hrmTickets, logDates, jiraStatus.state, logStatus.state, hrmStatus.state]);
 
   const handleLogHrm = useCallback(async () => {
     if (hrmTickets.length === 0 || isLogging) return;
@@ -140,7 +174,7 @@ export default function LogForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tickets: hrmTickets.map((t) => t.ticket),
-          date: selectedDate,
+          dates: logDates,
         }),
       });
       const data = (await res.json()) as HrmLogResponse;
@@ -153,7 +187,7 @@ export default function LogForm() {
     } catch {
       setHrmStatus({ state: "error", message: "Failed to reach HRM" });
     }
-  }, [hrmTickets, selectedDate, logStatus.state, hrmStatus.state]);
+  }, [hrmTickets, logDates, logStatus.state, hrmStatus.state]);
 
   const handleLogAll = useCallback(async () => {
     if (jiraStatus.state !== "success" || hrmTickets.length === 0 || isLogging) return;
@@ -163,15 +197,16 @@ export default function LogForm() {
 
     await Promise.all([
       (async () => {
+        const tscTicket = hrmTickets.map((t) => t.ticket).join(", ");
         try {
           const res = await fetch("/api/sharepoint/log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ticket, date: selectedDate }),
+            body: JSON.stringify({ ticket: tscTicket, dates: logDates }),
           });
           const data = (await res.json()) as LogResponse;
           if (data.success) {
-            setLogStatus({ state: "success", message: `Logged "${ticket}" at cell ${data.cell ?? "O"}` });
+            setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${data.cell ?? "O"}` });
           } else {
             setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
           }
@@ -184,7 +219,7 @@ export default function LogForm() {
           const res = await fetch("/api/hrm/log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tickets: hrmTickets.map((t) => t.ticket), date: selectedDate }),
+            body: JSON.stringify({ tickets: hrmTickets.map((t) => t.ticket), dates: logDates }),
           });
           const data = (await res.json()) as HrmLogResponse;
           if (data.success) {
@@ -198,7 +233,7 @@ export default function LogForm() {
         }
       })(),
     ]);
-  }, [ticket, selectedDate, jiraStatus.state, hrmTickets, logStatus.state, hrmStatus.state]);
+  }, [ticket, logDates, jiraStatus.state, hrmTickets, logStatus.state, hrmStatus.state]);
 
   return (
     <div className="space-y-6">
@@ -228,20 +263,51 @@ export default function LogForm() {
       </div>
 
       {/* Date picker */}
-      <div className="flex items-center gap-3">
-        <label htmlFor="log-date" className="text-sm font-medium text-gray-700">
-          Date:
-        </label>
-        <input
-          id="log-date"
-          type="date"
-          value={selectedDate}
-          min={min}
-          max={max}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm
-                     focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        />
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <label htmlFor="log-date" className="text-sm font-medium text-gray-700">
+            Date:
+          </label>
+          <input
+            id="log-date"
+            type="date"
+            value={stagingDate}
+            min={min}
+            max={max}
+            onChange={(e) => setStagingDate(e.target.value)}
+            className="rounded-md border border-gray-300 px-3 py-2 text-sm
+                       focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <button
+            type="button"
+            disabled={!stagingDate || logDates.includes(stagingDate)}
+            onClick={handleAddDate}
+            className="rounded-md bg-gray-600 px-3 py-2 text-sm font-medium text-white
+                       hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            + Add
+          </button>
+        </div>
+        {logDates.length > 0 && (
+          <ul className="space-y-1">
+            {logDates.map((d) => (
+              <li
+                key={d}
+                className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 text-sm"
+              >
+                <span className="text-gray-800">{d}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveDate(d)}
+                  className="text-red-500 hover:text-red-700 text-xs font-medium"
+                  aria-label={`Remove date ${d}`}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Status indicators */}

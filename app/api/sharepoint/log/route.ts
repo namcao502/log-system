@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeTicketViaPlaywright } from "@/lib/browser-log";
 import type { LogRequestBody, LogResponse } from "@/lib/types";
 
-const TICKET_PATTERN = /^MDP-\d+$/;
+const TICKET_PATTERN = /^MDP-\d+(,\s*MDP-\d+)*$/;
 
 export async function POST(
   request: NextRequest
@@ -18,7 +18,7 @@ export async function POST(
     );
   }
 
-  const { ticket, date } = body;
+  const { ticket, dates } = body;
 
   if (!ticket || !TICKET_PATTERN.test(ticket)) {
     return NextResponse.json(
@@ -27,8 +27,12 @@ export async function POST(
     );
   }
 
-  const dateObj = date ? new Date(`${date}T00:00:00`) : undefined;
-  const result = await writeTicketViaPlaywright(ticket, dateObj);
+  const dateObjs =
+    dates && dates.length > 0
+      ? dates.map((d) => new Date(`${d}T00:00:00`))
+      : undefined;
+
+  const result = await writeTicketViaPlaywright(ticket, dateObjs);
 
   if (result.success) {
     return NextResponse.json({ success: true, cell: result.cell });

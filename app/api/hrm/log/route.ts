@@ -18,7 +18,7 @@ export async function POST(
     );
   }
 
-  const { tickets, date } = body;
+  const { tickets, dates } = body;
 
   if (!Array.isArray(tickets) || tickets.length === 0 || tickets.length > 5) {
     return NextResponse.json(
@@ -36,15 +36,20 @@ export async function POST(
     }
   }
 
-  const dateObj = date ? new Date(`${date}T00:00:00`) : undefined;
-  const result = await logTicketsToHrm(tickets, dateObj);
+  const dateObjs =
+    dates && dates.length > 0
+      ? dates.map((d) => new Date(`${d}T00:00:00`))
+      : [undefined];
 
-  if (result.success) {
-    return NextResponse.json({ success: true });
-  } else {
-    return NextResponse.json(
-      { success: false, error: result.error },
-      { status: 500 }
-    );
+  for (const dateObj of dateObjs) {
+    const result = await logTicketsToHrm(tickets, dateObj);
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error },
+        { status: 500 }
+      );
+    }
   }
+
+  return NextResponse.json({ success: true });
 }

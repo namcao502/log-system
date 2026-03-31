@@ -110,17 +110,15 @@ async function navigateToCell(
 }
 
 
-export async function writeTicketViaPlaywright(
+const MAX_ATTEMPTS = 3;
+
+async function attemptWrite(
   ticket: string,
-  date?: Date
+  cellAddresses: string[],
+  elapsed: () => string
 ): Promise<{ success: boolean; cell: string; error?: string }> {
-  const cellAddress = getCellForDate(date ?? new Date());
-  const t0 = Date.now();
-  const elapsed = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
-
-  console.log(`[browser-log] Target cell: ${cellAddress}, ticket: ${ticket}`);
-
   let context: BrowserContext | null = null;
+  const cellsLabel = cellAddresses.join(", ");
 
   try {
     context = await chromium.launchPersistentContext(PLAYWRIGHT_PROFILE_DIR, {
@@ -152,63 +150,96 @@ export async function writeTicketViaPlaywright(
     await page.waitForTimeout(3000);
     console.log(`[browser-log] [${elapsed()}] Excel ready`);
 
-    // 1. Navigate to cell
-    const navSuccess = await navigateToCell(page, frame, cellAddress);
-    console.log(`[browser-log] [${elapsed()}] Nav done`);
-    if (!navSuccess) {
-      await context.close();
-      return { success: false, cell: cellAddress, error: "Could not navigate to target cell." };
-    }
-
-    // 2. Click formula bar to enter edit mode — use locator click to ensure
-    //    the iframe receives focus, then all locator keyboard events target it.
     const formulaBar = frame.locator("[id*='formulaBar'] [contenteditable]").first();
-    await formulaBar.click();
-    await page.waitForTimeout(500);
-    console.log(`[browser-log] [${elapsed()}] Formula bar clicked`);
 
-    // 3. Read current cell value from formula bar
-    const currentValue = (await formulaBar.textContent())?.trim() ?? "";
-    console.log(`[browser-log] [${elapsed()}] Read value: "${currentValue}"`);
+    for (const cellAddress of cellAddresses) {
+      // 1. Navigate to cell
+      const navSuccess = await navigateToCell(page, frame, cellAddress);
+      console.log(`[browser-log] [${elapsed()}] Nav done → ${cellAddress}`);
+      if (!navSuccess) {
+        await context.close();
+        return { success: false, cell: cellsLabel, error: `Could not navigate to target cell ${cellAddress}.` };
+      }
 
-    // Skip if ticket is already in the cell
-    if (currentValue.includes(ticket)) {
-      console.log(`[browser-log] [${elapsed()}] "${ticket}" already in cell, skipping`);
-      await page.keyboard.press("Escape");
-      await context.close();
-      return { success: true, cell: cellAddress };
+      // 2. Click formula bar to enter edit mode
+      await formulaBar.click();
+      await page.waitForTimeout(500);
+
+      // 3. Read current cell value
+      const currentValue = (await formulaBar.textContent())?.trim() ?? "";
+      console.log(`[browser-log] [${elapsed()}] ${cellAddress} value: "${currentValue}"`);
+
+      // Skip if ticket is already in the cell
+      if (currentValue.includes(ticket)) {
+        console.log(`[browser-log] [${elapsed()}] "${ticket}" already in ${cellAddress}, skipping`);
+        await page.keyboard.press("Escape");
+        continue;
+      }
+
+      // Append if current value contains a valid ticket pattern, otherwise replace
+      const hasValidContent = currentValue && /MDP-\d+/.test(currentValue);
+      const newValue = hasValidContent ? `${currentValue}, ${ticket}` : ticket;
+
+      // 4. Select all, type new value, commit
+      await formulaBar.press("Control+a");
+      await page.waitForTimeout(300);
+      await formulaBar.pressSequentially(newValue, { delay: 50 });
+      await page.waitForTimeout(500);
+      console.log(`[browser-log] [${elapsed()}] Typed "${newValue}" into ${cellAddress}`);
+
+      const fbAfter = (await formulaBar.textContent())?.trim() ?? "";
+      console.log(`[browser-log] Formula bar after typing: "${fbAfter}"`);
+
+      await formulaBar.press("Enter");
+      console.log(`[browser-log] [${elapsed()}] Committed ${cellAddress}`);
+
+      // Short pause between cells to let Excel settle
+      if (cellAddresses.indexOf(cellAddress) < cellAddresses.length - 1) {
+        await page.waitForTimeout(1000);
+      }
     }
 
-    // Append if current value contains a valid ticket pattern, otherwise replace
-    const hasValidContent = currentValue && /MDP-\d+/.test(currentValue);
-    const newValue = hasValidContent ? `${currentValue}, ${ticket}` : ticket;
-
-    // 4. Select all in formula bar, type new value, commit — all via locator
-    await formulaBar.press("Control+a");
-    await page.waitForTimeout(300);
-    await formulaBar.pressSequentially(newValue, { delay: 50 });
-    await page.waitForTimeout(500);
-    console.log(`[browser-log] [${elapsed()}] Typed "${newValue}"`);
-
-    // Verify formula bar shows the correct value before committing
-    const fbAfter = (await formulaBar.textContent())?.trim() ?? "";
-    console.log(`[browser-log] Formula bar after typing: "${fbAfter}"`);
-
-    await formulaBar.press("Enter");
-    console.log(`[browser-log] [${elapsed()}] Committed`);
-
-    // Wait for auto-save
+    // Wait for auto-save after all writes
     await page.waitForTimeout(3000);
     console.log(`[browser-log] [${elapsed()}] Done!`);
     await context.close();
 
-    return { success: true, cell: cellAddress };
+    return { success: true, cell: cellsLabel };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error(`[browser-log] [${elapsed()}] Error: ${message}`);
     if (context) {
       try { await context.close(); } catch { /* ignore */ }
     }
-    return { success: false, cell: cellAddress, error: message };
+    return { success: false, cell: cellsLabel, error: message };
   }
+}
+
+export async function writeTicketViaPlaywright(
+  ticket: string,
+  dates?: Date[]
+): Promise<{ success: boolean; cell: string; error?: string }> {
+  const effectiveDates = dates && dates.length > 0 ? dates : [new Date()];
+  const cellAddresses = effectiveDates.map(getCellForDate);
+  const t0 = Date.now();
+  const elapsed = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
+
+  console.log(`[browser-log] Target cells: ${cellAddresses.join(", ")}, ticket: ${ticket}`);
+
+  const errors: string[] = [];
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    if (attempt > 1) {
+      console.log(`[browser-log] Retry attempt ${attempt}/${MAX_ATTEMPTS}`);
+    }
+
+    const result = await attemptWrite(ticket, cellAddresses, elapsed);
+    if (result.success) return result;
+
+    const msg = result.error ?? "Unknown error";
+    errors.push(`Attempt ${attempt}: ${msg}`);
+    console.log(`[browser-log] Attempt ${attempt} failed: ${msg}`);
+  }
+
+  return { success: false, cell: cellAddresses.join(", "), error: errors.join(" | ") };
 }
