@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { JiraVerifyResponse, LogResponse, HrmLogResponse } from "@/lib/types";
 import StatusIndicator from "./StatusIndicator";
 
@@ -35,6 +35,15 @@ function getTodayDateString(): string {
   const month = parts.find((p) => p.type === "month")!.value;
   const day = parts.find((p) => p.type === "day")!.value;
   return `${year}-${month}-${day}`;
+}
+
+function formatDateDisplay(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(year, month - 1, day));
 }
 
 function getCurrentYearBounds(): { min: string; max: string } {
@@ -75,6 +84,18 @@ export default function LogForm() {
       setVerifiedTickets([]);
     },
     []
+  );
+
+  const handleStagingDateChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setStagingDate(value);
+      // When exactly one date is selected, update it in-place instead of requiring "+ Add"
+      if (logDates.length === 1) {
+        setLogDates([value]);
+      }
+    },
+    [logDates.length]
   );
 
   const handleAddDate = useCallback(() => {
@@ -138,6 +159,24 @@ export default function LogForm() {
   }, []);
 
   const isLogging = logStatus.state === "loading" || hrmStatus.state === "loading";
+
+  useEffect(() => {
+    if (jiraStatus.state !== "success") return;
+    const id = setTimeout(() => setJiraStatus({ state: "idle" }), 10000);
+    return () => clearTimeout(id);
+  }, [jiraStatus.state]);
+
+  useEffect(() => {
+    if (logStatus.state !== "success") return;
+    const id = setTimeout(() => setLogStatus({ state: "idle" }), 10000);
+    return () => clearTimeout(id);
+  }, [logStatus.state]);
+
+  useEffect(() => {
+    if (hrmStatus.state !== "success") return;
+    const id = setTimeout(() => setHrmStatus({ state: "idle" }), 10000);
+    return () => clearTimeout(id);
+  }, [hrmStatus.state]);
 
   const handleLogTsc = useCallback(async () => {
     if (jiraStatus.state !== "success" || isLogging) return;
@@ -235,19 +274,28 @@ export default function LogForm() {
     ]);
   }, [ticket, logDates, jiraStatus.state, hrmTickets, logStatus.state, hrmStatus.state]);
 
+  const logAllLabel = `Log All — ${hrmTickets.length} ticket${hrmTickets.length !== 1 ? "s" : ""} × ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
+
   return (
-    <div className="space-y-6">
-      {/* Ticket input + Verify */}
-      <div className="flex items-center gap-3">
+    <div className="space-y-5">
+      {/* Tickets section */}
+      <div className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Tickets</p>
+        <div className="flex items-center gap-3">
         <label htmlFor="ticket" className="text-sm font-medium text-gray-700">
           Task:
         </label>
         <input
           id="ticket"
           type="text"
-          placeholder="MDP-0000"
+          placeholder="MDP-1234 or MDP-1234, MDP-5678"
           value={ticket}
           onChange={handleTicketChange}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && isTicketValid && jiraStatus.state !== "loading") {
+              handleVerify();
+            }
+          }}
           className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm
                      focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
@@ -260,10 +308,15 @@ export default function LogForm() {
         >
           Verify
         </button>
+        </div>
       </div>
 
-      {/* Date picker */}
-      <div className="space-y-2">
+      <hr className="border-gray-100" />
+
+      {/* Dates section */}
+      <div className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Dates</p>
+        <div className="space-y-2">
         <div className="flex items-center gap-3">
           <label htmlFor="log-date" className="text-sm font-medium text-gray-700">
             Date:
@@ -274,7 +327,7 @@ export default function LogForm() {
             value={stagingDate}
             min={min}
             max={max}
-            onChange={(e) => setStagingDate(e.target.value)}
+            onChange={handleStagingDateChange}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm
                        focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
@@ -295,23 +348,27 @@ export default function LogForm() {
                 key={d}
                 className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 text-sm"
               >
-                <span className="text-gray-800">{d}</span>
+                <span className="text-gray-800">{formatDateDisplay(d)}</span>
                 <button
                   type="button"
                   onClick={() => handleRemoveDate(d)}
-                  className="text-red-500 hover:text-red-700 text-xs font-medium"
+                  className="ml-2 shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
                   aria-label={`Remove date ${d}`}
                 >
-                  Remove
+                  ✕
                 </button>
               </li>
             ))}
           </ul>
         )}
+        </div>
       </div>
+
+      <hr className="border-gray-100" />
 
       {/* Status indicators */}
       <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Status</p>
         <StatusIndicator
           label="Jira"
           status={jiraStatus.state}
@@ -354,31 +411,41 @@ export default function LogForm() {
             HRM Tickets ({hrmTickets.length}/{MAX_HRM_TICKETS}):
           </p>
           <ul className="space-y-1">
-            {hrmTickets.map((item) => (
-              <li
-                key={item.ticket}
-                className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 text-sm"
-              >
-                <span className="text-gray-800">{item.ticket}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveFromHrm(item.ticket)}
-                  className="text-red-500 hover:text-red-700 text-xs font-medium"
-                  aria-label={`Remove ${item.ticket}`}
+            {hrmTickets.map((item) => {
+              const description = item.summary.slice(item.ticket.length + 3);
+              return (
+                <li
+                  key={item.ticket}
+                  className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 text-sm"
                 >
-                  Remove
-                </button>
-              </li>
-            ))}
+                  <span className="flex flex-col min-w-0">
+                    <span className="font-medium text-gray-800">{item.ticket}</span>
+                    {description && (
+                      <span className="truncate text-xs text-gray-500">{description}</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFromHrm(item.ticket)}
+                    className="ml-3 shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                    aria-label={`Remove ${item.ticket}`}
+                  >
+                    ✕
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
+
+      <hr className="border-gray-100" />
 
       {/* Action buttons */}
       <div className="flex flex-col gap-3">
         <button
           type="button"
-          disabled={jiraStatus.state !== "success" || isLogging}
+          disabled={jiraStatus.state !== "success" || logDates.length === 0 || isLogging}
           onClick={handleLogTsc}
           className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
                      hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -399,8 +466,8 @@ export default function LogForm() {
             type="button"
             disabled={hrmTickets.length === 0 || isLogging}
             onClick={handleLogHrm}
-            className="flex-1 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
-                       hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 rounded-md bg-teal-600 px-4 py-2.5 text-sm font-medium text-white
+                       hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Log HRM ({hrmTickets.length})
           </button>
@@ -412,7 +479,7 @@ export default function LogForm() {
           className="w-full rounded-md bg-purple-600 px-4 py-2.5 text-sm font-medium text-white
                      hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Log All (TSC + HRM)
+          {logAllLabel}
         </button>
       </div>
     </div>
