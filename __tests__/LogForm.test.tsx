@@ -76,7 +76,7 @@ function jsonResponse(data: Record<string, unknown>, status = 200) {
 }
 
 async function typeTicket(user: ReturnType<typeof userEvent.setup>, value: string) {
-  const input = screen.getByPlaceholderText("MDP-0000");
+  const input = screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678");
   await user.clear(input);
   await user.type(input, value);
 }
@@ -87,11 +87,13 @@ async function verifySuccessFlow(user: ReturnType<typeof userEvent.setup>) {
   );
   await typeTicket(user, "MDP-1234");
   await user.click(screen.getByRole("button", { name: /verify/i }));
+  // Wait for the ticket to appear in the staged list (auto-staged on verify)
   await waitFor(() =>
-    expect(screen.getByText(/Fix login bug/)).toBeInTheDocument()
+    expect(screen.getByText("MDP-1234")).toBeInTheDocument()
   );
 }
 
+// Verify a ticket and wait for it to be auto-staged in the staged ticket list.
 async function addTicketToHrm(
   user: ReturnType<typeof userEvent.setup>,
   ticketId: string,
@@ -103,9 +105,8 @@ async function addTicketToHrm(
   await typeTicket(user, ticketId);
   await user.click(screen.getByRole("button", { name: /verify/i }));
   await waitFor(() =>
-    expect(screen.getByText(new RegExp(summary))).toBeInTheDocument()
+    expect(screen.getByText(ticketId)).toBeInTheDocument()
   );
-  await user.click(screen.getByRole("button", { name: /add to hrm/i }));
 }
 
 function getTodayISO(): string {
@@ -128,7 +129,7 @@ function getTodayISO(): string {
 describe("LogForm -- input rendering", () => {
   it("renders ticket input with placeholder", () => {
     render(<LogForm />);
-    expect(screen.getByPlaceholderText("MDP-0000")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678")).toBeInTheDocument();
   });
 
   it("renders the Task label", () => {
@@ -140,7 +141,7 @@ describe("LogForm -- input rendering", () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await typeTicket(user, "mdp-1234");
-    expect(screen.getByPlaceholderText("MDP-0000")).toHaveValue("MDP-1234");
+    expect(screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678")).toHaveValue("MDP-1234");
   });
 });
 
@@ -236,7 +237,7 @@ describe("LogForm -- Verify happy path", () => {
     await user.click(screen.getByRole("button", { name: /verify/i }));
 
     await waitFor(() =>
-      expect(screen.getByText(/Implement dashboard/)).toBeInTheDocument()
+      expect(screen.getAllByText(/Implement dashboard/).length).toBeGreaterThan(0)
     );
   });
 
@@ -276,7 +277,7 @@ describe("LogForm -- Verify error paths", () => {
     await user.click(screen.getByRole("button", { name: /verify/i }));
 
     await waitFor(() =>
-      expect(screen.getByText("Ticket not found")).toBeInTheDocument()
+      expect(screen.getByText(/Invalid: MDP-0001/)).toBeInTheDocument()
     );
   });
 
@@ -290,7 +291,7 @@ describe("LogForm -- Verify error paths", () => {
     await user.click(screen.getByRole("button", { name: /verify/i }));
 
     await waitFor(() =>
-      expect(screen.getByText("Ticket not found")).toBeInTheDocument()
+      expect(screen.getByText(/Invalid: MDP-0002/)).toBeInTheDocument()
     );
   });
 
@@ -348,7 +349,7 @@ describe("LogForm -- Log TSC happy path", () => {
       expect(call).toBeTruthy();
       const body = JSON.parse((call![1] as RequestInit).body as string);
       expect(body).toMatchObject({ ticket: "MDP-1234" });
-      expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(body.dates[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
   });
 });
@@ -433,7 +434,7 @@ describe("LogForm -- Log HRM happy path", () => {
       expect(call).toBeTruthy();
       const body = JSON.parse((call![1] as RequestInit).body as string);
       expect(body).toMatchObject({ tickets: ["MDP-1234"] });
-      expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(body.dates[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
   });
 
@@ -504,7 +505,7 @@ describe("LogForm -- HRM ticket list", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     expect(screen.getByText("MDP-1234")).toBeInTheDocument();
-    expect(screen.getByText(/HRM Tickets \(1\/5\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Staged Tickets \(1\/5\)/)).toBeInTheDocument();
   });
 
   it("removes a ticket from the HRM list", async () => {
@@ -514,7 +515,7 @@ describe("LogForm -- HRM ticket list", () => {
     expect(screen.getByText("MDP-1234")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
-    expect(screen.queryByText(/HRM Tickets/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Staged Tickets/)).not.toBeInTheDocument();
   });
 
   it("prevents adding duplicate tickets", async () => {
@@ -522,18 +523,18 @@ describe("LogForm -- HRM ticket list", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
-    // Try to verify and add the same ticket again
+    // Verify the same ticket again -- auto-stage should skip the duplicate
     mockFetch.mockReturnValueOnce(
       jsonResponse({ valid: true, summary: "Fix login bug" })
     );
     await typeTicket(user, "MDP-1234");
     await user.click(screen.getByRole("button", { name: /verify/i }));
     await waitFor(() =>
-      expect(screen.getByText(/Fix login bug/)).toBeInTheDocument()
+      expect(screen.getByText(/Staged Tickets/)).toBeInTheDocument()
     );
 
-    // "Add to HRM" should be disabled since ticket is already in the list
-    expect(screen.getByRole("button", { name: /add to hrm/i })).toBeDisabled();
+    // Only one instance of MDP-1234 should appear in the staged list
+    expect(screen.getAllByText("MDP-1234")).toHaveLength(1);
   });
 
   it("shows ticket count in Log HRM button", async () => {
@@ -557,11 +558,13 @@ describe("LogForm -- status reset on input change", () => {
     render(<LogForm />);
 
     await verifySuccessFlow(user);
-    expect(screen.getByText(/Fix login bug/)).toBeInTheDocument();
+    // The full status message (ticket + summary) is shown in the Jira indicator
+    expect(screen.getByText(/MDP-1234 — Fix login bug/)).toBeInTheDocument();
 
     await typeTicket(user, "MDP-9999");
 
-    expect(screen.queryByText(/Fix login bug/)).not.toBeInTheDocument();
+    // Jira status indicator message clears (ticket stays staged but status resets)
+    expect(screen.queryByText(/MDP-1234 — Fix login bug/)).not.toBeInTheDocument();
   });
 });
 
@@ -646,21 +649,22 @@ describe("LogForm -- loading states", () => {
 describe("LogForm -- date picker", () => {
   it("renders date input with today's value on initial render", () => {
     render(<LogForm />);
-    const dateInput = screen.getByLabelText(/date/i);
+    const dateInput = screen.getByLabelText("Date:");
     expect(dateInput).toHaveValue(getTodayISO());
   });
 
-  it("resets date to today when ticket input changes", async () => {
+  it("preserves selected date when ticket input changes", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
 
-    const dateInput = screen.getByLabelText(/date/i);
+    const dateInput = screen.getByLabelText("Date:");
     fireEvent.change(dateInput, { target: { value: "2026-01-15" } });
     expect(dateInput).toHaveValue("2026-01-15");
 
     await typeTicket(user, "MDP-9999");
 
-    expect(dateInput).toHaveValue(getTodayISO());
+    // Date is not reset when ticket changes
+    expect(dateInput).toHaveValue("2026-01-15");
   });
 
   it("Log TSC sends the selected date", async () => {
@@ -668,7 +672,7 @@ describe("LogForm -- date picker", () => {
     render(<LogForm />);
     await verifySuccessFlow(user);
 
-    fireEvent.change(screen.getByLabelText(/date/i), { target: { value: "2026-01-15" } });
+    fireEvent.change(screen.getByLabelText("Date:"), { target: { value: "2026-01-15" } });
 
     mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O15" }));
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
@@ -677,7 +681,7 @@ describe("LogForm -- date picker", () => {
       const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/sharepoint/log");
       expect(call).toBeTruthy();
       const body = JSON.parse((call![1] as RequestInit).body as string);
-      expect(body.date).toBe("2026-01-15");
+      expect(body.dates[0]).toBe("2026-01-15");
     });
   });
 
@@ -686,7 +690,7 @@ describe("LogForm -- date picker", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
-    fireEvent.change(screen.getByLabelText(/date/i), { target: { value: "2026-01-15" } });
+    fireEvent.change(screen.getByLabelText("Date:"), { target: { value: "2026-01-15" } });
 
     mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
@@ -695,7 +699,7 @@ describe("LogForm -- date picker", () => {
       const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/hrm/log");
       expect(call).toBeTruthy();
       const body = JSON.parse((call![1] as RequestInit).body as string);
-      expect(body.date).toBe("2026-01-15");
+      expect(body.dates[0]).toBe("2026-01-15");
     });
   });
 });
@@ -710,10 +714,12 @@ describe("LogForm -- Log All button disabled states", () => {
     expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
   });
 
-  it("is disabled when Jira is verified but HRM ticket list is empty", async () => {
+  it("is disabled when all staged tickets are removed after verification", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await verifySuccessFlow(user);
+    // Remove the auto-staged ticket
+    await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
     expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
   });
 
