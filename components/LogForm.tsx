@@ -61,19 +61,11 @@ export default function LogForm() {
   const [jiraStatus, setJiraStatus] = useState<AsyncStatus>({ state: "idle" });
   const [logStatus, setLogStatus] = useState<AsyncStatus>({ state: "idle" });
   const [hrmStatus, setHrmStatus] = useState<AsyncStatus>({ state: "idle" });
-  const [hrmTickets, setHrmTickets] = useState<HrmTicketItem[]>([]);
+  const [stagedTickets, setStagedTickets] = useState<HrmTicketItem[]>([]);
   const [verifiedTickets, setVerifiedTickets] = useState<HrmTicketItem[]>([]);
 
   const isTicketValid = INPUT_REGEX.test(ticket.trim());
   const { min, max } = getCurrentYearBounds();
-
-  const newTickets = verifiedTickets.filter(
-    (v) => !hrmTickets.some((h) => h.ticket === v.ticket)
-  );
-  const canAddToHrm =
-    jiraStatus.state === "success" &&
-    newTickets.length > 0 &&
-    hrmTickets.length + newTickets.length <= MAX_HRM_TICKETS;
 
   const handleTicketChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,13 +141,8 @@ export default function LogForm() {
     }
   }, [ticket, isTicketValid]);
 
-  const handleAddToHrm = useCallback(() => {
-    if (!canAddToHrm) return;
-    setHrmTickets((prev) => [...prev, ...newTickets]);
-  }, [newTickets, canAddToHrm]);
-
-  const handleRemoveFromHrm = useCallback((ticketId: string) => {
-    setHrmTickets((prev) => prev.filter((t) => t.ticket !== ticketId));
+  const handleRemoveFromStaged = useCallback((ticketId: string) => {
+    setStagedTickets((prev) => prev.filter((t) => t.ticket !== ticketId));
   }, []);
 
   const isLogging = logStatus.state === "loading" || hrmStatus.state === "loading";
@@ -181,8 +168,8 @@ export default function LogForm() {
   const handleLogTsc = useCallback(async () => {
     if (jiraStatus.state !== "success" || isLogging) return;
 
-    const tscTicket = hrmTickets.length > 0
-      ? hrmTickets.map((t) => t.ticket).join(", ")
+    const tscTicket = stagedTickets.length > 0
+      ? stagedTickets.map((t) => t.ticket).join(", ")
       : ticket;
 
     setLogStatus({ state: "loading" });
@@ -201,10 +188,10 @@ export default function LogForm() {
     } catch {
       setLogStatus({ state: "error", message: "Failed to write to Excel" });
     }
-  }, [ticket, hrmTickets, logDates, jiraStatus.state, logStatus.state, hrmStatus.state]);
+  }, [ticket, stagedTickets, logDates, jiraStatus.state, logStatus.state, hrmStatus.state]);
 
   const handleLogHrm = useCallback(async () => {
-    if (hrmTickets.length === 0 || isLogging) return;
+    if (stagedTickets.length === 0 || isLogging) return;
 
     setHrmStatus({ state: "loading" });
     try {
@@ -212,13 +199,13 @@ export default function LogForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tickets: hrmTickets.map((t) => t.ticket),
+          tickets: stagedTickets.map((t) => t.ticket),
           dates: logDates,
         }),
       });
       const data = (await res.json()) as HrmLogResponse;
       if (data.success) {
-        const ticketIds = hrmTickets.map((t) => t.ticket).join(", ");
+        const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
         setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
       } else {
         setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
@@ -226,17 +213,17 @@ export default function LogForm() {
     } catch {
       setHrmStatus({ state: "error", message: "Failed to reach HRM" });
     }
-  }, [hrmTickets, logDates, logStatus.state, hrmStatus.state]);
+  }, [stagedTickets, logDates, logStatus.state, hrmStatus.state]);
 
   const handleLogAll = useCallback(async () => {
-    if (jiraStatus.state !== "success" || hrmTickets.length === 0 || isLogging) return;
+    if (jiraStatus.state !== "success" || stagedTickets.length === 0 || isLogging) return;
 
     setLogStatus({ state: "loading" });
     setHrmStatus({ state: "loading" });
 
     await Promise.all([
       (async () => {
-        const tscTicket = hrmTickets.map((t) => t.ticket).join(", ");
+        const tscTicket = stagedTickets.map((t) => t.ticket).join(", ");
         try {
           const res = await fetch("/api/sharepoint/log", {
             method: "POST",
@@ -258,11 +245,11 @@ export default function LogForm() {
           const res = await fetch("/api/hrm/log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tickets: hrmTickets.map((t) => t.ticket), dates: logDates }),
+            body: JSON.stringify({ tickets: stagedTickets.map((t) => t.ticket), dates: logDates }),
           });
           const data = (await res.json()) as HrmLogResponse;
           if (data.success) {
-            const ticketIds = hrmTickets.map((t) => t.ticket).join(", ");
+            const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
             setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
           } else {
             setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
@@ -272,9 +259,9 @@ export default function LogForm() {
         }
       })(),
     ]);
-  }, [ticket, logDates, jiraStatus.state, hrmTickets, logStatus.state, hrmStatus.state]);
+  }, [ticket, logDates, jiraStatus.state, stagedTickets, logStatus.state, hrmStatus.state]);
 
-  const logAllLabel = `Log All — ${hrmTickets.length} ticket${hrmTickets.length !== 1 ? "s" : ""} × ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
+  const logAllLabel = `Log All — ${stagedTickets.length} ticket${stagedTickets.length !== 1 ? "s" : ""} × ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
 
   return (
     <div className="space-y-5">
@@ -404,14 +391,14 @@ export default function LogForm() {
         />
       </div>
 
-      {/* HRM ticket list */}
-      {hrmTickets.length > 0 && (
+      {/* Staged ticket list */}
+      {stagedTickets.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray-700">
-            HRM Tickets ({hrmTickets.length}/{MAX_HRM_TICKETS}):
+            Staged Tickets ({stagedTickets.length}/{MAX_HRM_TICKETS}):
           </p>
           <ul className="space-y-1">
-            {hrmTickets.map((item) => {
+            {stagedTickets.map((item) => {
               const description = item.summary.slice(item.ticket.length + 3);
               return (
                 <li
@@ -426,7 +413,7 @@ export default function LogForm() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => handleRemoveFromHrm(item.ticket)}
+                    onClick={() => handleRemoveFromStaged(item.ticket)}
                     className="ml-3 shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
                     aria-label={`Remove ${item.ticket}`}
                   >
@@ -455,26 +442,17 @@ export default function LogForm() {
         <div className="flex gap-3">
           <button
             type="button"
-            disabled={!canAddToHrm || isLogging}
-            onClick={handleAddToHrm}
-            className="flex-1 rounded-md bg-green-600 px-4 py-2.5 text-sm font-medium text-white
-                       hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Add to HRM
-          </button>
-          <button
-            type="button"
-            disabled={hrmTickets.length === 0 || isLogging}
+            disabled={stagedTickets.length === 0 || isLogging}
             onClick={handleLogHrm}
             className="flex-1 rounded-md bg-teal-600 px-4 py-2.5 text-sm font-medium text-white
                        hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Log HRM ({hrmTickets.length})
+            Log HRM ({stagedTickets.length})
           </button>
         </div>
         <button
           type="button"
-          disabled={jiraStatus.state !== "success" || hrmTickets.length === 0 || isLogging}
+          disabled={jiraStatus.state !== "success" || stagedTickets.length === 0 || isLogging}
           onClick={handleLogAll}
           className="w-full rounded-md bg-purple-600 px-4 py-2.5 text-sm font-medium text-white
                      hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
