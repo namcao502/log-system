@@ -132,6 +132,13 @@ export default function LogForm() {
         state: "success",
         message: verified.map((v) => v.summary).join(" | "),
       });
+      // Auto-stage: append new tickets, skip duplicates, respect MAX_HRM_TICKETS
+      setStagedTickets((prev) => {
+        const existingIds = new Set(prev.map((t) => t.ticket));
+        const toAdd = verified.filter((v) => !existingIds.has(v.ticket));
+        const combined = [...prev, ...toAdd];
+        return combined.slice(0, MAX_HRM_TICKETS);
+      });
     } catch {
       setJiraStatus({ state: "error", message: "Failed to reach Jira API" });
     }

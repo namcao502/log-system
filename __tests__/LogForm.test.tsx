@@ -838,6 +838,26 @@ describe("LogForm -- Log All parallel execution", () => {
     });
   });
 
+  it("auto-stages tickets after successful verify without clicking Add to HRM", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ valid: true, summary: "Fix login bug" }),
+    }) as jest.Mock;
+
+    render(<LogForm />);
+
+    fireEvent.change(screen.getByPlaceholderText(/MDP-1234/), {
+      target: { value: "MDP-1234" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /verify/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("MDP-1234")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("button", { name: /add to hrm/i })).not.toBeInTheDocument();
+  });
+
   it("resets both statuses to idle when ticket input changes after Log All", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
