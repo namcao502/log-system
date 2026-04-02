@@ -62,7 +62,6 @@ export default function LogForm() {
   const [logStatus, setLogStatus] = useState<AsyncStatus>({ state: "idle" });
   const [hrmStatus, setHrmStatus] = useState<AsyncStatus>({ state: "idle" });
   const [stagedTickets, setStagedTickets] = useState<HrmTicketItem[]>([]);
-  const [verifiedTickets, setVerifiedTickets] = useState<HrmTicketItem[]>([]);
 
   const isTicketValid = INPUT_REGEX.test(ticket.trim());
   const { min, max } = getCurrentYearBounds();
@@ -73,7 +72,6 @@ export default function LogForm() {
       setJiraStatus({ state: "idle" });
       setLogStatus({ state: "idle" });
       setHrmStatus({ state: "idle" });
-      setVerifiedTickets([]);
     },
     []
   );
@@ -105,7 +103,6 @@ export default function LogForm() {
     setJiraStatus({ state: "loading" });
     setLogStatus({ state: "idle" });
     setHrmStatus({ state: "idle" });
-    setVerifiedTickets([]);
 
     const tickets = parseTickets(ticket);
 
@@ -131,7 +128,6 @@ export default function LogForm() {
         ticket: r.ticket,
         summary: `${r.ticket} — ${r.data.summary ?? "No summary"}`,
       }));
-      setVerifiedTickets(verified);
       setJiraStatus({
         state: "success",
         message: verified.map((v) => v.summary).join(" | "),
@@ -188,7 +184,7 @@ export default function LogForm() {
     } catch {
       setLogStatus({ state: "error", message: "Failed to write to Excel" });
     }
-  }, [ticket, stagedTickets, logDates, jiraStatus.state, logStatus.state, hrmStatus.state]);
+  }, [ticket, stagedTickets, logDates, jiraStatus.state]);
 
   const handleLogHrm = useCallback(async () => {
     if (stagedTickets.length === 0 || isLogging) return;
@@ -259,7 +255,7 @@ export default function LogForm() {
         }
       })(),
     ]);
-  }, [ticket, logDates, jiraStatus.state, stagedTickets, logStatus.state, hrmStatus.state]);
+  }, [logDates, jiraStatus.state, stagedTickets, logStatus.state, hrmStatus.state]);
 
   const logAllLabel = `Log All — ${stagedTickets.length} ticket${stagedTickets.length !== 1 ? "s" : ""} × ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
 
