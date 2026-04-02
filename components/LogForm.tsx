@@ -209,7 +209,7 @@ export default function LogForm() {
     } catch {
       setHrmStatus({ state: "error", message: "Failed to reach HRM" });
     }
-  }, [stagedTickets, logDates, logStatus.state, hrmStatus.state]);
+  }, [stagedTickets, logDates]);
 
   const handleLogAll = useCallback(async () => {
     if (jiraStatus.state !== "success" || stagedTickets.length === 0 || isLogging) return;
