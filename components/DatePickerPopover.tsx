@@ -129,7 +129,7 @@ export default function DatePickerPopover({
               week: "",
               day: "text-center p-0.5",
               day_button:
-                "h-8 w-8 rounded-lg text-sm text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition-colors w-full flex items-center justify-center",
+                "h-8 w-8 mx-auto rounded-lg text-sm text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition-colors flex items-center justify-center",
               selected:
                 "[&>button]:!bg-blue-600 [&>button]:!text-white [&>button]:hover:!bg-blue-500",
               today:
