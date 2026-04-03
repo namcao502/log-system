@@ -458,17 +458,15 @@ export default function LogForm() {
         >
           Log TSC
         </button>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            disabled={stagedTickets.length === 0 || isLogging}
-            onClick={handleLogHrm}
-            className="flex-1 rounded-md bg-teal-600 px-4 py-2.5 text-sm font-medium text-white
-                       hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Log HRM ({stagedTickets.length})
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled={stagedTickets.length === 0 || isLogging}
+          onClick={handleLogHrm}
+          className="w-full rounded-md bg-teal-600 px-4 py-2.5 text-sm font-medium text-white
+                     hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Log HRM ({stagedTickets.length})
+        </button>
         <button
           type="button"
           disabled={jiraStatus.state !== "success" || stagedTickets.length === 0 || isLogging}
