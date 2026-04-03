@@ -89,7 +89,7 @@ async function verifySuccessFlow(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: /verify/i }));
   // Wait for the ticket to appear in the staged list (auto-staged on verify)
   await waitFor(() =>
-    expect(screen.getByText("MDP-1234")).toBeInTheDocument()
+    expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0)
   );
 }
 
@@ -105,7 +105,7 @@ async function addTicketToHrm(
   await typeTicket(user, ticketId);
   await user.click(screen.getByRole("button", { name: /verify/i }));
   await waitFor(() =>
-    expect(screen.getByText(ticketId)).toBeInTheDocument()
+    expect(screen.getAllByText(ticketId).length).toBeGreaterThan(0)
   );
 }
 
@@ -504,7 +504,7 @@ describe("LogForm -- HRM ticket list", () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
-    expect(screen.getByText("MDP-1234")).toBeInTheDocument();
+    expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0);
     expect(screen.getByText(/Staged Tickets \(1\/5\)/)).toBeInTheDocument();
   });
 
@@ -512,7 +512,7 @@ describe("LogForm -- HRM ticket list", () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
-    expect(screen.getByText("MDP-1234")).toBeInTheDocument();
+    expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
     expect(screen.queryByText(/Staged Tickets/)).not.toBeInTheDocument();
@@ -533,8 +533,8 @@ describe("LogForm -- HRM ticket list", () => {
       expect(screen.getByText(/Staged Tickets/)).toBeInTheDocument()
     );
 
-    // Only one instance of MDP-1234 should appear in the staged list
-    expect(screen.getAllByText("MDP-1234")).toHaveLength(1);
+    // Only one remove button for MDP-1234 means only one entry in the staged list
+    expect(screen.getAllByRole("button", { name: /remove MDP-1234/i })).toHaveLength(1);
   });
 
   it("shows ticket count in Log HRM button", async () => {
@@ -858,10 +858,35 @@ describe("LogForm -- Log All parallel execution", () => {
     fireEvent.click(screen.getByRole("button", { name: /verify/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("MDP-1234")).toBeInTheDocument();
+      expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0);
     });
 
     expect(screen.queryByRole("button", { name: /add to hrm/i })).not.toBeInTheDocument();
+  });
+
+  it("shows summary banner after verify with tickets and dates staged", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ valid: true, summary: "Fix login bug" }),
+    }) as jest.Mock;
+
+    render(<LogForm />);
+
+    fireEvent.change(screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678"), {
+      target: { value: "MDP-1234" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /verify/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/will log/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText(/MDP-1234/).length).toBeGreaterThan(0);
+  });
+
+  it("hides summary banner when staged tickets list is empty", () => {
+    render(<LogForm />);
+    expect(screen.queryByText(/will log/i)).not.toBeInTheDocument();
   });
 
   it("resets both statuses to idle when ticket input changes after Log All", async () => {

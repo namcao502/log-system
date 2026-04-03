@@ -354,6 +354,22 @@ export default function LogForm() {
         </div>
       </div>
 
+      {/* Summary banner */}
+      {stagedTickets.length > 0 && logDates.length > 0 && (
+        <>
+          <hr className="border-gray-100" />
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
+            <p className="font-medium text-blue-800">Will log:</p>
+            <p className="mt-1 text-blue-700">
+              {stagedTickets.map((t) => t.ticket).join(", ")}
+            </p>
+            <p className="text-blue-600">
+              on {logDates.map((d) => formatDateDisplay(d)).join(", ")}
+            </p>
+          </div>
+        </>
+      )}
+
       <hr className="border-gray-100" />
 
       {/* Status indicators */}
