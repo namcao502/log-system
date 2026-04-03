@@ -1,5 +1,7 @@
 # HRM Log Button Implementation Plan
 
+> **Status: COMPLETED** — implemented and shipped.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a standalone "Log HRM" button beside the existing "Log TSC" button so the user can log to each system independently after Jira verification.
