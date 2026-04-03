@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeTicketViaPlaywright } from "@/lib/browser-log";
-import type { LogRequestBody, LogResponse } from "@/lib/types";
+import type { LogRequestBody, LogStreamLine } from "@/lib/types";
 
 const TICKET_PATTERN = /^MDP-\d+(,\s*MDP-\d+)*$/;
 
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse<LogResponse>> {
+export async function POST(request: NextRequest): Promise<Response> {
   let body: LogRequestBody;
 
   try {
@@ -32,14 +30,33 @@ export async function POST(
       ? dates.map((d) => new Date(`${d}T00:00:00`))
       : undefined;
 
-  const result = await writeTicketViaPlaywright(ticket, dateObjs);
+  const encoder = new TextEncoder();
+  const stream = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = stream.writable.getWriter();
 
-  if (result.success) {
-    return NextResponse.json({ success: true, cell: result.cell, logs: result.logs });
-  } else {
-    return NextResponse.json(
-      { success: false, cell: result.cell, error: result.error, logs: result.logs },
-      { status: 500 }
-    );
-  }
+  const writeLine = (obj: LogStreamLine) => {
+    writer.write(encoder.encode(JSON.stringify(obj) + "\n"));
+  };
+
+  (async () => {
+    try {
+      const result = await writeTicketViaPlaywright(ticket, dateObjs, (line) => {
+        writeLine({ type: "log", data: line });
+      });
+      writeLine(
+        result.success
+          ? { type: "result", success: true, cell: result.cell }
+          : { type: "result", success: false, cell: result.cell, error: result.error ?? "Unknown error" }
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      writeLine({ type: "result", success: false, error: message });
+    } finally {
+      await writer.close();
+    }
+  })();
+
+  return new Response(stream.readable, {
+    headers: { "Content-Type": "application/x-ndjson" },
+  });
 }

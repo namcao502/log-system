@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logTicketsToHrm } from "@/lib/browser-hrm";
-import type { HrmLogRequestBody, HrmLogResponse } from "@/lib/types";
+import type { HrmLogRequestBody, HrmStreamLine } from "@/lib/types";
 
 const TICKET_PATTERN = /^MDP-\d+$/;
 
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse<HrmLogResponse>> {
+export async function POST(request: NextRequest): Promise<Response> {
   let body: HrmLogRequestBody;
 
   try {
@@ -41,18 +39,35 @@ export async function POST(
       ? dates.map((d) => new Date(`${d}T00:00:00`))
       : [undefined];
 
-  const allLogs: string[] = [];
+  const encoder = new TextEncoder();
+  const stream = new TransformStream<Uint8Array, Uint8Array>();
+  const writer = stream.writable.getWriter();
 
-  for (const dateObj of dateObjs) {
-    const result = await logTicketsToHrm(tickets, dateObj);
-    allLogs.push(...(result.logs ?? []));
-    if (!result.success) {
-      return NextResponse.json(
-        { success: false, error: result.error, logs: allLogs },
-        { status: 500 }
-      );
+  const writeLine = (obj: HrmStreamLine) => {
+    writer.write(encoder.encode(JSON.stringify(obj) + "\n"));
+  };
+
+  (async () => {
+    try {
+      for (const dateObj of dateObjs) {
+        const result = await logTicketsToHrm(tickets, dateObj, (line) => {
+          writeLine({ type: "log", data: line });
+        });
+        if (!result.success) {
+          writeLine({ type: "result", success: false, error: result.error ?? "Unknown error" });
+          return;
+        }
+      }
+      writeLine({ type: "result", success: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      writeLine({ type: "result", success: false, error: message });
+    } finally {
+      await writer.close();
     }
-  }
+  })();
 
-  return NextResponse.json({ success: true, logs: allLogs });
+  return new Response(stream.readable, {
+    headers: { "Content-Type": "application/x-ndjson" },
+  });
 }
