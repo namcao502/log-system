@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import type { JiraVerifyResponse, LogResponse, HrmLogResponse } from "@/lib/types";
+import type { JiraVerifyResponse } from "@/lib/types";
 import StatusIndicator from "./StatusIndicator";
 import DatePickerPopover from "./DatePickerPopover";
 
@@ -53,6 +53,39 @@ function getCurrentYearBounds(): { min: string; max: string } {
     year: "numeric",
   }).format(new Date());
   return { min: `${yearStr}-01-01`, max: `${yearStr}-12-31` };
+}
+
+async function readNdJsonStream(
+  body: ReadableStream<Uint8Array>,
+  onLog: (line: string) => void
+): Promise<{ success: boolean; cell?: string; error?: string }> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const msg = JSON.parse(line) as {
+        type: string;
+        data?: string;
+        success?: boolean;
+        cell?: string;
+        error?: string;
+      };
+      if (msg.type === "log" && msg.data !== undefined) {
+        onLog(msg.data);
+      } else if (msg.type === "result") {
+        return { success: msg.success ?? false, cell: msg.cell, error: msg.error };
+      }
+    }
+  }
+  return { success: false, error: "Stream ended unexpectedly" };
 }
 
 export default function LogForm() {
@@ -217,14 +250,23 @@ export default function LogForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ticket: tscTicket, dates: logDates }),
       });
-      const data = (await res.json()) as LogResponse;
-      if (data.success) {
-        setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${data.cell ?? "O"}` });
-        setTscLogs(data.logs ?? []);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
+        return;
+      }
+      if (!res.body) {
+        setLogStatus({ state: "error", message: "Failed to log" });
+        return;
+      }
+      const result = await readNdJsonStream(res.body, (line) =>
+        setTscLogs((prev) => [...prev, line])
+      );
+      if (result.success) {
+        setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${result.cell ?? "O"}` });
         setStagedTickets([]);
       } else {
-        setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
-        setTscLogs(data.logs ?? []);
+        setLogStatus({ state: "error", message: result.error || "Failed to log" });
       }
     } catch {
       setLogStatus({ state: "error", message: "Failed to write to Excel" });
@@ -245,15 +287,24 @@ export default function LogForm() {
           dates: logDates,
         }),
       });
-      const data = (await res.json()) as HrmLogResponse;
-      if (data.success) {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
+        return;
+      }
+      if (!res.body) {
+        setHrmStatus({ state: "error", message: "Failed to log to HRM" });
+        return;
+      }
+      const result = await readNdJsonStream(res.body, (line) =>
+        setHrmLogs((prev) => [...prev, line])
+      );
+      if (result.success) {
         const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
         setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
-        setHrmLogs(data.logs ?? []);
         setStagedTickets([]);
       } else {
-        setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
-        setHrmLogs(data.logs ?? []);
+        setHrmStatus({ state: "error", message: result.error || "Failed to log to HRM" });
       }
     } catch {
       setHrmStatus({ state: "error", message: "Failed to reach HRM" });
@@ -263,6 +314,8 @@ export default function LogForm() {
   const handleLogAll = useCallback(async () => {
     if (stagedTickets.length === 0 || isLogging) return;
 
+    const tscTicket = stagedTickets.map((t) => t.ticket).join(", ");
+
     setLogStatus({ state: "loading" });
     setHrmStatus({ state: "loading" });
     setTscLogs([]);
@@ -270,21 +323,29 @@ export default function LogForm() {
 
     await Promise.all([
       (async () => {
-        const tscTicket = stagedTickets.map((t) => t.ticket).join(", ");
         try {
           const res = await fetch("/api/sharepoint/log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ticket: tscTicket, dates: logDates }),
           });
-          const data = (await res.json()) as LogResponse;
-          if (data.success) {
-            setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${data.cell ?? "O"}` });
-            setTscLogs(data.logs ?? []);
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({})) as { error?: string };
+            setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
+            return;
+          }
+          if (!res.body) {
+            setLogStatus({ state: "error", message: "Failed to log" });
+            return;
+          }
+          const result = await readNdJsonStream(res.body, (line) =>
+            setTscLogs((prev) => [...prev, line])
+          );
+          if (result.success) {
+            setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${result.cell ?? "O"}` });
             setStagedTickets([]);
           } else {
-            setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
-            setTscLogs(data.logs ?? []);
+            setLogStatus({ state: "error", message: result.error || "Failed to log" });
           }
         } catch {
           setLogStatus({ state: "error", message: "Failed to write to Excel" });
@@ -297,15 +358,24 @@ export default function LogForm() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ tickets: stagedTickets.map((t) => t.ticket), dates: logDates }),
           });
-          const data = (await res.json()) as HrmLogResponse;
-          if (data.success) {
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({})) as { error?: string };
+            setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
+            return;
+          }
+          if (!res.body) {
+            setHrmStatus({ state: "error", message: "Failed to log to HRM" });
+            return;
+          }
+          const result = await readNdJsonStream(res.body, (line) =>
+            setHrmLogs((prev) => [...prev, line])
+          );
+          if (result.success) {
             const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
             setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
-            setHrmLogs(data.logs ?? []);
             setStagedTickets([]);
           } else {
-            setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
-            setHrmLogs(data.logs ?? []);
+            setHrmStatus({ state: "error", message: result.error || "Failed to log to HRM" });
           }
         } catch {
           setHrmStatus({ state: "error", message: "Failed to reach HRM" });
