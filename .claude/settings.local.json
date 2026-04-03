@@ -31,7 +31,9 @@
       "Bash(openspec status:*)",
       "Bash(openspec instructions:*)",
       "Bash(bash \"C:/Users/NamNguyen/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/skills/brainstorming/scripts/start-server.sh\" --project-dir \"C:/TEST/log-system\")",
-      "Bash(cat \"C:/TEST/log-system/.superpowers/brainstorm/\"*\"/.server-info\")"
+      "Bash(cat \"C:/TEST/log-system/.superpowers/brainstorm/\"*\"/.server-info\")",
+      "Skill(update-config)",
+      "Skill(keybindings-help)"
     ]
   }
 }

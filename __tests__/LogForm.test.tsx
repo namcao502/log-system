@@ -132,9 +132,9 @@ describe("LogForm -- input rendering", () => {
     expect(screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678")).toBeInTheDocument();
   });
 
-  it("renders the Task label", () => {
+  it("renders the Ticket label", () => {
     render(<LogForm />);
-    expect(screen.getByText("Task:")).toBeInTheDocument();
+    expect(screen.getByText("Ticket:")).toBeInTheDocument();
   });
 
   it("converts typed text to uppercase", async () => {
@@ -514,7 +514,10 @@ describe("LogForm -- HRM ticket list", () => {
     expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
-    expect(screen.queryByText("MDP-1234")).not.toBeInTheDocument();
+    await waitFor(
+      () => expect(screen.queryByText("MDP-1234")).not.toBeInTheDocument(),
+      { timeout: 500 }
+    );
   });
 
   it("prevents adding duplicate tickets", async () => {
@@ -719,7 +722,10 @@ describe("LogForm -- Log All button disabled states", () => {
     await verifySuccessFlow(user);
     // Remove the auto-staged ticket
     await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
-    expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled(),
+      { timeout: 500 }
+    );
   });
 
   it("is disabled when staged list is empty", async () => {
@@ -728,7 +734,10 @@ describe("LogForm -- Log All button disabled states", () => {
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     // Remove the staged ticket — Log All should become disabled
     await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
-    expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled(),
+      { timeout: 500 }
+    );
   });
 
   it("is enabled when Jira is verified AND HRM list has tickets", async () => {

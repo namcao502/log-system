@@ -43,7 +43,7 @@ describe("StatusIndicator -- label", () => {
 describe("StatusIndicator -- idle state", () => {
   it("renders a grey dot when status is idle", () => {
     const { container } = renderIndicator({ status: "idle" });
-    const dot = container.querySelector("span.bg-gray-300");
+    const dot = container.querySelector("span.bg-slate-600");
     expect(dot).toBeInTheDocument();
   });
 
@@ -70,12 +70,12 @@ describe("StatusIndicator -- loading state", () => {
   it("renders the message in blue when provided", () => {
     renderIndicator({ status: "loading", message: "Verifying..." });
     const msg = screen.getByText("Verifying...");
-    expect(msg).toHaveClass("text-blue-700");
+    expect(msg).toHaveClass("text-blue-400");
   });
 
   it("does not render a grey dot or checkmark", () => {
     const { container } = renderIndicator({ status: "loading" });
-    expect(container.querySelector("span.bg-gray-300")).not.toBeInTheDocument();
+    expect(container.querySelector("span.bg-slate-600")).not.toBeInTheDocument();
     expect(screen.queryByText("\u2713")).not.toBeInTheDocument();
   });
 });
@@ -89,13 +89,13 @@ describe("StatusIndicator -- success state", () => {
     renderIndicator({ status: "success", message: "OK" });
     // Checkmark character: ✓ (U+2713)
     const check = screen.getByText("\u2713");
-    expect(check).toHaveClass("text-green-600");
+    expect(check).toHaveClass("text-green-500");
   });
 
   it("renders the message in green", () => {
     renderIndicator({ status: "success", message: "MDP-1234 -- Summary" });
     const msg = screen.getByText("MDP-1234 -- Summary");
-    expect(msg).toHaveClass("text-green-700");
+    expect(msg).toHaveClass("text-green-400");
   });
 });
 
@@ -108,13 +108,13 @@ describe("StatusIndicator -- error state", () => {
     renderIndicator({ status: "error", message: "Not found" });
     // Cross character: ✕ (U+2715)
     const cross = screen.getByText("\u2715");
-    expect(cross).toHaveClass("text-red-600");
+    expect(cross).toHaveClass("text-red-500");
   });
 
   it("renders the message in red", () => {
     renderIndicator({ status: "error", message: "Ticket not found" });
     const msg = screen.getByText("Ticket not found");
-    expect(msg).toHaveClass("text-red-700");
+    expect(msg).toHaveClass("text-red-400");
   });
 });
 

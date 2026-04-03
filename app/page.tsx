@@ -9,7 +9,6 @@ function getFormattedDate(): string {
     year: "numeric",
     timeZone: "Asia/Ho_Chi_Minh",
   });
-
   return formatter.format(now);
 }
 
@@ -17,16 +16,13 @@ export default function Home() {
   const today = getFormattedDate();
 
   return (
-    <main className="flex min-h-screen items-start justify-center px-4 pt-20">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
-        <h1 className="text-xl font-semibold text-gray-900">
-          Welcome, Nam Nguyen
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">Today: {today}</p>
-
-        <hr className="my-6 border-gray-200" />
-
-        <LogForm />
+    <main className="flex min-h-screen items-start justify-center bg-slate-950 px-4 pt-16">
+      <div className="w-full max-w-lg">
+        <h1 className="text-lg font-semibold text-slate-100">Welcome, Nam Nguyen</h1>
+        <p className="mt-1 text-sm text-slate-500">Today: {today}</p>
+        <div className="mt-6">
+          <LogForm />
+        </div>
       </div>
     </main>
   );

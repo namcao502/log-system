@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import type { JiraVerifyResponse, LogResponse, HrmLogResponse } from "@/lib/types";
 import StatusIndicator from "./StatusIndicator";
+import DatePickerPopover from "./DatePickerPopover";
 
 type AsyncStatus =
   | { state: "idle" }
@@ -62,6 +63,10 @@ export default function LogForm() {
   const [logStatus, setLogStatus] = useState<AsyncStatus>({ state: "idle" });
   const [hrmStatus, setHrmStatus] = useState<AsyncStatus>({ state: "idle" });
   const [stagedTickets, setStagedTickets] = useState<HrmTicketItem[]>([]);
+  const [exitingTickets, setExitingTickets] = useState<Set<string>>(new Set());
+  const [jiraFading, setJiraFading] = useState(false);
+  const [logFading, setLogFading] = useState(false);
+  const [hrmFading, setHrmFading] = useState(false);
 
   const isTicketValid = INPUT_REGEX.test(ticket.trim());
   const { min, max } = getCurrentYearBounds();
@@ -77,8 +82,7 @@ export default function LogForm() {
   );
 
   const handleStagingDateChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
+    (value: string) => {
       setStagingDate(value);
       // When exactly one date is selected, update it in-place instead of requiring "+ Add"
       if (logDates.length === 1) {
@@ -139,33 +143,63 @@ export default function LogForm() {
         const combined = [...prev, ...toAdd];
         return combined.slice(0, MAX_HRM_TICKETS);
       });
+      document.getElementById("log-date")?.focus();
     } catch {
       setJiraStatus({ state: "error", message: "Failed to reach Jira API" });
     }
   }, [ticket, isTicketValid]);
 
   const handleRemoveFromStaged = useCallback((ticketId: string) => {
-    setStagedTickets((prev) => prev.filter((t) => t.ticket !== ticketId));
+    setExitingTickets((prev) => new Set([...prev, ticketId]));
+    setTimeout(() => {
+      setStagedTickets((prev) => prev.filter((t) => t.ticket !== ticketId));
+      setExitingTickets((prev) => {
+        const next = new Set(prev);
+        next.delete(ticketId);
+        return next;
+      });
+    }, 150);
   }, []);
 
   const isLogging = logStatus.state === "loading" || hrmStatus.state === "loading";
 
   useEffect(() => {
     if (jiraStatus.state !== "success") return;
-    const id = setTimeout(() => setJiraStatus({ state: "idle" }), 10000);
-    return () => clearTimeout(id);
+    const fadeId = setTimeout(() => setJiraFading(true), 19500);
+    const clearId = setTimeout(() => {
+      setJiraStatus({ state: "idle" });
+      setJiraFading(false);
+    }, 20000);
+    return () => {
+      clearTimeout(fadeId);
+      clearTimeout(clearId);
+    };
   }, [jiraStatus.state]);
 
   useEffect(() => {
     if (logStatus.state !== "success") return;
-    const id = setTimeout(() => setLogStatus({ state: "idle" }), 10000);
-    return () => clearTimeout(id);
+    const fadeId = setTimeout(() => setLogFading(true), 9500);
+    const clearId = setTimeout(() => {
+      setLogStatus({ state: "idle" });
+      setLogFading(false);
+    }, 10000);
+    return () => {
+      clearTimeout(fadeId);
+      clearTimeout(clearId);
+    };
   }, [logStatus.state]);
 
   useEffect(() => {
     if (hrmStatus.state !== "success") return;
-    const id = setTimeout(() => setHrmStatus({ state: "idle" }), 10000);
-    return () => clearTimeout(id);
+    const fadeId = setTimeout(() => setHrmFading(true), 9500);
+    const clearId = setTimeout(() => {
+      setHrmStatus({ state: "idle" });
+      setHrmFading(false);
+    }, 10000);
+    return () => {
+      clearTimeout(fadeId);
+      clearTimeout(clearId);
+    };
   }, [hrmStatus.state]);
 
   const handleLogTsc = useCallback(async () => {
@@ -183,6 +217,7 @@ export default function LogForm() {
       const data = (await res.json()) as LogResponse;
       if (data.success) {
         setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${data.cell ?? "O"}` });
+        setStagedTickets([]);
       } else {
         setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
       }
@@ -208,6 +243,7 @@ export default function LogForm() {
       if (data.success) {
         const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
         setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
+        setStagedTickets([]);
       } else {
         setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
       }
@@ -234,6 +270,7 @@ export default function LogForm() {
           const data = (await res.json()) as LogResponse;
           if (data.success) {
             setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${data.cell ?? "O"}` });
+            setStagedTickets([]);
           } else {
             setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
           }
@@ -252,6 +289,7 @@ export default function LogForm() {
           if (data.success) {
             const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
             setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
+            setStagedTickets([]);
           } else {
             setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
           }
@@ -263,15 +301,29 @@ export default function LogForm() {
   }, [logDates, stagedTickets, isLogging]);
 
   const logAllLabel = `Log All — ${stagedTickets.length} ticket${stagedTickets.length !== 1 ? "s" : ""} × ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
+  const showFormatError = ticket.length > 0 && !isTicketValid;
 
   return (
-    <div className="space-y-5">
-      {/* Tickets section */}
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Tickets</p>
+    <div className="space-y-2.5">
+      {/* Tickets card */}
+      <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+            {stagedTickets.length > 0 ? `Tickets (${stagedTickets.length}/5)` : "Tickets"}
+          </p>
+          {stagedTickets.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setStagedTickets([])}
+              className="text-xs text-slate-500 hover:text-red-400"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-3">
-          <label htmlFor="ticket" className="text-sm font-medium text-gray-700">
-            Task:
+          <label htmlFor="ticket" className="text-sm font-medium text-slate-400">
+            Ticket:
           </label>
           <input
             id="ticket"
@@ -284,22 +336,30 @@ export default function LogForm() {
                 handleVerify();
               }
             }}
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm
-                       focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className={`flex-1 rounded-lg border bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 ${
+              showFormatError
+                ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                : "border-slate-700 focus:border-blue-500 focus:ring-blue-500"
+            }`}
           />
           <button
             type="button"
             disabled={!isTicketValid || jiraStatus.state === "loading"}
             onClick={handleVerify}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white
-                       hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white
+                       active:scale-95 transition-transform duration-100
+                       hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Verify
           </button>
         </div>
+        {showFormatError && (
+          <p className="text-xs text-red-400">Use MDP-xxxx format</p>
+        )}
         <StatusIndicator
           label="Jira"
           status={jiraStatus.state}
+          fading={jiraFading}
           message={
             jiraStatus.state === "success" || jiraStatus.state === "error"
               ? jiraStatus.message
@@ -309,24 +369,26 @@ export default function LogForm() {
           }
         />
         {stagedTickets.length > 0 && (
-          <ul className="space-y-1">
+          <ul className="space-y-1.5">
             {stagedTickets.map((item) => {
               const description = item.summary.slice(item.ticket.length + 3);
               return (
                 <li
                   key={item.ticket}
-                  className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 text-sm"
+                  className={`flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm transition-all duration-150 ${
+                    exitingTickets.has(item.ticket) ? "opacity-0 -translate-y-1.5" : "animate-slide-in"
+                  }`}
                 >
                   <span className="flex flex-col min-w-0">
-                    <span className="font-medium text-gray-800">{item.ticket}</span>
+                    <span className="font-medium text-slate-200">{item.ticket}</span>
                     {description && (
-                      <span className="truncate text-xs text-gray-500">{description}</span>
+                      <span className="truncate text-xs text-slate-500">{description}</span>
                     )}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveFromStaged(item.ticket)}
-                    className="ml-3 shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                    className="ml-3 shrink-0 rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-red-400"
                     aria-label={`Remove ${item.ticket}`}
                   >
                     ✕
@@ -338,67 +400,60 @@ export default function LogForm() {
         )}
       </div>
 
-      <hr className="border-gray-100" />
-
-      {/* Dates section */}
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Dates</p>
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <label htmlFor="log-date" className="text-sm font-medium text-gray-700">
-              Date:
-            </label>
-            <input
-              id="log-date"
-              type="date"
-              value={stagingDate}
-              min={min}
-              max={max}
-              onChange={handleStagingDateChange}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm
-                         focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-            <button
-              type="button"
-              disabled={!stagingDate || logDates.includes(stagingDate)}
-              onClick={handleAddDate}
-              className="rounded-md bg-gray-600 px-3 py-2 text-sm font-medium text-white
-                         hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              + Add
-            </button>
-          </div>
-          {logDates.length > 0 && (
-            <ul className="space-y-1">
-              {logDates.map((d) => (
-                <li
-                  key={d}
-                  className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 text-sm"
-                >
-                  <span className="text-gray-800">{formatDateDisplay(d)}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveDate(d)}
-                    className="ml-2 shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                    aria-label={`Remove date ${d}`}
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+      {/* Dates card */}
+      <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Dates</p>
+        <div className="flex items-center gap-3">
+          <label htmlFor="log-date" className="text-sm font-medium text-slate-400">
+            Date:
+          </label>
+          <DatePickerPopover
+            id="log-date"
+            value={stagingDate}
+            onChange={handleStagingDateChange}
+            min={min}
+            max={max}
+          />
+          <button
+            type="button"
+            disabled={!stagingDate || logDates.includes(stagingDate)}
+            onClick={handleAddDate}
+            className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-300
+                       active:scale-95 transition-transform duration-100
+                       hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            + Add
+          </button>
         </div>
+        {logDates.length > 0 && (
+          <ul className="space-y-1.5">
+            {logDates.map((d) => (
+              <li
+                key={d}
+                className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+              >
+                <span className="text-slate-300">{formatDateDisplay(d)}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveDate(d)}
+                  className="ml-2 shrink-0 rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-red-400"
+                  aria-label={`Remove date ${d}`}
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
-      <hr className="border-gray-100" />
-
-      {/* Status indicators — TSC + HRM only */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Status</p>
+      {/* Status card */}
+      <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Status</p>
         <StatusIndicator
           label="TSC Log"
           status={logStatus.state}
+          fading={logFading}
           message={
             logStatus.state === "success" || logStatus.state === "error"
               ? logStatus.message
@@ -410,6 +465,7 @@ export default function LogForm() {
         <StatusIndicator
           label="HRM Log"
           status={hrmStatus.state}
+          fading={hrmFading}
           message={
             hrmStatus.state === "success" || hrmStatus.state === "error"
               ? hrmStatus.message
@@ -418,52 +474,54 @@ export default function LogForm() {
                 : undefined
           }
         />
+        {stagedTickets.length > 0 && logDates.length > 0 && (
+          <div className="rounded-lg border border-blue-900/50 border-l-[3px] border-l-blue-500 bg-blue-950/30 px-4 py-3 text-sm">
+            <p className="font-medium text-blue-300">Will log:</p>
+            <p className="mt-1 text-blue-400">
+              {stagedTickets.map((t) => t.ticket).join(", ")}
+            </p>
+            <p className="text-blue-500">
+              on {logDates.map((d) => formatDateDisplay(d)).join(", ")}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Summary banner — below Status */}
-      {stagedTickets.length > 0 && logDates.length > 0 && (
-        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
-          <p className="font-medium text-blue-800">Will log:</p>
-          <p className="mt-1 text-blue-700">
-            {stagedTickets.map((t) => t.ticket).join(", ")}
-          </p>
-          <p className="text-blue-600">
-            on {logDates.map((d) => formatDateDisplay(d)).join(", ")}
-          </p>
+      {/* Actions card */}
+      <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Actions</p>
+        <div className="flex flex-col gap-2.5">
+          <button
+            type="button"
+            disabled={stagedTickets.length === 0 || logDates.length === 0 || isLogging}
+            onClick={handleLogTsc}
+            className="w-full rounded-lg border border-blue-600 bg-transparent px-4 py-2.5 text-sm font-medium text-blue-400
+                       active:scale-95 transition-transform duration-100
+                       hover:bg-blue-950 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Log TSC
+          </button>
+          <button
+            type="button"
+            disabled={stagedTickets.length === 0 || isLogging}
+            onClick={handleLogHrm}
+            className="w-full rounded-lg border border-teal-600 bg-transparent px-4 py-2.5 text-sm font-medium text-teal-400
+                       active:scale-95 transition-transform duration-100
+                       hover:bg-teal-950 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Log HRM ({stagedTickets.length})
+          </button>
+          <button
+            type="button"
+            disabled={stagedTickets.length === 0 || isLogging}
+            onClick={handleLogAll}
+            className="w-full rounded-lg bg-violet-700 px-4 py-3 text-sm font-medium text-white
+                       active:scale-95 transition-transform duration-100
+                       hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {logAllLabel}
+          </button>
         </div>
-      )}
-
-      <hr className="border-gray-100" />
-
-      {/* Action buttons */}
-      <div className="flex flex-col gap-3">
-        <button
-          type="button"
-          disabled={stagedTickets.length === 0 || logDates.length === 0 || isLogging}
-          onClick={handleLogTsc}
-          className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
-                     hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Log TSC
-        </button>
-        <button
-          type="button"
-          disabled={stagedTickets.length === 0 || isLogging}
-          onClick={handleLogHrm}
-          className="w-full rounded-md bg-teal-600 px-4 py-2.5 text-sm font-medium text-white
-                     hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Log HRM ({stagedTickets.length})
-        </button>
-        <button
-          type="button"
-          disabled={stagedTickets.length === 0 || isLogging}
-          onClick={handleLogAll}
-          className="w-full rounded-md bg-purple-600 px-4 py-2.5 text-sm font-medium text-white
-                     hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {logAllLabel}
-        </button>
       </div>
     </div>
   );
