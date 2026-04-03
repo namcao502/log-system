@@ -35,10 +35,10 @@ export async function POST(
   const result = await writeTicketViaPlaywright(ticket, dateObjs);
 
   if (result.success) {
-    return NextResponse.json({ success: true, cell: result.cell });
+    return NextResponse.json({ success: true, cell: result.cell, logs: result.logs });
   } else {
     return NextResponse.json(
-      { success: false, cell: result.cell, error: result.error },
+      { success: false, cell: result.cell, error: result.error, logs: result.logs },
       { status: 500 }
     );
   }

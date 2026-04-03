@@ -41,15 +41,18 @@ export async function POST(
       ? dates.map((d) => new Date(`${d}T00:00:00`))
       : [undefined];
 
+  const allLogs: string[] = [];
+
   for (const dateObj of dateObjs) {
     const result = await logTicketsToHrm(tickets, dateObj);
+    allLogs.push(...(result.logs ?? []));
     if (!result.success) {
       return NextResponse.json(
-        { success: false, error: result.error },
+        { success: false, error: result.error, logs: allLogs },
         { status: 500 }
       );
     }
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, logs: allLogs });
 }
