@@ -75,6 +75,22 @@ function jsonResponse(data: Record<string, unknown>, status = 200) {
   } as Response);
 }
 
+function streamResponse(lines: object[], status = 200): Promise<Response> {
+  const text = lines.map((l) => JSON.stringify(l)).join("\n") + "\n";
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(text));
+      controller.close();
+    },
+  });
+  return Promise.resolve({
+    ok: status >= 200 && status < 300,
+    status,
+    body,
+    json: () => Promise.resolve({}),
+  } as unknown as Response);
+}
+
 async function typeTicket(user: ReturnType<typeof userEvent.setup>, value: string) {
   const input = screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678");
   await user.clear(input);
@@ -322,7 +338,7 @@ describe("LogForm -- Log TSC happy path", () => {
     await verifySuccessFlow(user);
 
     mockFetch.mockReturnValueOnce(
-      jsonResponse({ success: true, cell: "O66" })
+      streamResponse([{ type: "result", success: true, cell: "O66" }])
     );
 
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
@@ -339,7 +355,7 @@ describe("LogForm -- Log TSC happy path", () => {
     await verifySuccessFlow(user);
 
     mockFetch.mockReturnValueOnce(
-      jsonResponse({ success: true, cell: "O66" })
+      streamResponse([{ type: "result", success: true, cell: "O66" }])
     );
 
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
@@ -366,7 +382,7 @@ describe("LogForm -- Log TSC error paths", () => {
     await verifySuccessFlow(user);
 
     mockFetch.mockReturnValueOnce(
-      jsonResponse({ success: false, error: "Browser automation failed" })
+      streamResponse([{ type: "result", success: false, error: "Browser automation failed" }])
     );
 
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
@@ -382,7 +398,9 @@ describe("LogForm -- Log TSC error paths", () => {
 
     await verifySuccessFlow(user);
 
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: false }));
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: false, error: "" }])
+    );
 
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
@@ -416,7 +434,7 @@ describe("LogForm -- Log HRM happy path", () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    mockFetch.mockReturnValueOnce(streamResponse([{ type: "result", success: true }]));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
       expect(screen.getByText(/Logged MDP-1234 to HRM timesheet/)).toBeInTheDocument()
@@ -427,7 +445,7 @@ describe("LogForm -- Log HRM happy path", () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    mockFetch.mockReturnValueOnce(streamResponse([{ type: "result", success: true }]));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() => {
       const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/hrm/log");
@@ -443,7 +461,7 @@ describe("LogForm -- Log HRM happy path", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-100", "Feature A");
     await addTicketToHrm(user, "MDP-200", "Feature B");
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    mockFetch.mockReturnValueOnce(streamResponse([{ type: "result", success: true }]));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() => {
       const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/hrm/log");
@@ -464,7 +482,7 @@ describe("LogForm -- Log HRM error paths", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(
-      jsonResponse({ success: false, error: "HRM automation failed" })
+      streamResponse([{ type: "result", success: false, error: "HRM automation failed" }])
     );
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
@@ -476,7 +494,9 @@ describe("LogForm -- Log HRM error paths", () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: false }));
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: false, error: "" }])
+    );
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
       expect(screen.getByText("Failed to log to HRM")).toBeInTheDocument()
@@ -676,7 +696,9 @@ describe("LogForm -- date picker", () => {
 
     fireEvent.change(screen.getByLabelText("Date:"), { target: { value: "2026-01-15" } });
 
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O15" }));
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: true, cell: "O15" }])
+    );
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     await waitFor(() => {
@@ -694,7 +716,7 @@ describe("LogForm -- date picker", () => {
 
     fireEvent.change(screen.getByLabelText("Date:"), { target: { value: "2026-01-15" } });
 
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    mockFetch.mockReturnValueOnce(streamResponse([{ type: "result", success: true }]));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
 
     await waitFor(() => {
@@ -796,8 +818,12 @@ describe("LogForm -- Log All parallel execution", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O66" }));
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: true, cell: "O66" }])
+    );
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: true }])
+    );
     await user.click(screen.getByRole("button", { name: /log all/i }));
 
     await waitFor(() => {
@@ -812,8 +838,12 @@ describe("LogForm -- Log All parallel execution", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O66" }));
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: true, cell: "O66" }])
+    );
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: true }])
+    );
     await user.click(screen.getByRole("button", { name: /log all/i }));
 
     await waitFor(() => {
@@ -827,8 +857,12 @@ describe("LogForm -- Log All parallel execution", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O66" }));
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: false, error: "HRM error" }));
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: true, cell: "O66" }])
+    );
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: false, error: "HRM error" }])
+    );
     await user.click(screen.getByRole("button", { name: /log all/i }));
 
     await waitFor(() => {
@@ -842,8 +876,12 @@ describe("LogForm -- Log All parallel execution", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: false, error: "TSC error" }));
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: false, error: "TSC error" }])
+    );
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: true }])
+    );
     await user.click(screen.getByRole("button", { name: /log all/i }));
 
     await waitFor(() => {
@@ -933,8 +971,12 @@ describe("LogForm -- Log All parallel execution", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "O66" }));
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true }));
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: true, cell: "O66" }])
+    );
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: true }])
+    );
     await user.click(screen.getByRole("button", { name: /log all/i }));
 
     await waitFor(() =>
@@ -966,11 +1008,11 @@ describe("LogForm -- log banner", () => {
 
     // Log TSC — response includes logs
     mockFetch.mockReturnValueOnce(
-      jsonResponse({
-        success: true,
-        cell: "M95",
-        logs: ["[browser-log] [0.0s] Browser launched", "[browser-log] [2.1s] Done!"],
-      })
+      streamResponse([
+        { type: "log", data: "[browser-log] [0.0s] Browser launched" },
+        { type: "log", data: "[browser-log] [2.1s] Done!" },
+        { type: "result", success: true, cell: "M95" },
+      ])
     );
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
     await waitFor(() =>
@@ -990,10 +1032,11 @@ describe("LogForm -- log banner", () => {
 
     // Log HRM — response includes logs
     mockFetch.mockReturnValueOnce(
-      jsonResponse({
-        success: true,
-        logs: ["[hrm-log] [0.0s] Browser launched", "[hrm-log] [3.2s] Done!"],
-      })
+      streamResponse([
+        { type: "log", data: "[hrm-log] [0.0s] Browser launched" },
+        { type: "log", data: "[hrm-log] [3.2s] Done!" },
+        { type: "result", success: true },
+      ])
     );
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
@@ -1012,7 +1055,10 @@ describe("LogForm -- log banner", () => {
     await waitFor(() => expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0));
 
     mockFetch.mockReturnValueOnce(
-      jsonResponse({ success: true, cell: "M95", logs: ["[browser-log] [0.0s] Browser launched"] })
+      streamResponse([
+        { type: "log", data: "[browser-log] [0.0s] Browser launched" },
+        { type: "result", success: true, cell: "M95" },
+      ])
     );
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
     await waitFor(() =>
@@ -1025,7 +1071,9 @@ describe("LogForm -- log banner", () => {
     await user.click(screen.getByRole("button", { name: /verify/i }));
     await waitFor(() => expect(screen.getAllByText("MDP-5678").length).toBeGreaterThan(0));
 
-    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "M96" }));
+    mockFetch.mockReturnValueOnce(
+      streamResponse([{ type: "result", success: true, cell: "M96" }])
+    );
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: /lines/i })).not.toBeInTheDocument()
