@@ -262,7 +262,7 @@ export default function LogForm() {
         }
       })(),
     ]);
-  }, [logDates, jiraStatus.state, stagedTickets, logStatus.state, hrmStatus.state, isLogging]);
+  }, [logDates, jiraStatus.state, stagedTickets, isLogging]);
 
   const logAllLabel = `Log All — ${stagedTickets.length} ticket${stagedTickets.length !== 1 ? "s" : ""} × ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
 
@@ -272,109 +272,33 @@ export default function LogForm() {
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Tickets</p>
         <div className="flex items-center gap-3">
-        <label htmlFor="ticket" className="text-sm font-medium text-gray-700">
-          Task:
-        </label>
-        <input
-          id="ticket"
-          type="text"
-          placeholder="MDP-1234 or MDP-1234, MDP-5678"
-          value={ticket}
-          onChange={handleTicketChange}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && isTicketValid && jiraStatus.state !== "loading") {
-              handleVerify();
-            }
-          }}
-          className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm
-                     focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        />
-        <button
-          type="button"
-          disabled={!isTicketValid || jiraStatus.state === "loading"}
-          onClick={handleVerify}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white
-                     hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Verify
-        </button>
-        </div>
-      </div>
-
-      <hr className="border-gray-100" />
-
-      {/* Dates section */}
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Dates</p>
-        <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <label htmlFor="log-date" className="text-sm font-medium text-gray-700">
-            Date:
+          <label htmlFor="ticket" className="text-sm font-medium text-gray-700">
+            Task:
           </label>
           <input
-            id="log-date"
-            type="date"
-            value={stagingDate}
-            min={min}
-            max={max}
-            onChange={handleStagingDateChange}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm
+            id="ticket"
+            type="text"
+            placeholder="MDP-1234 or MDP-1234, MDP-5678"
+            value={ticket}
+            onChange={handleTicketChange}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && isTicketValid && jiraStatus.state !== "loading") {
+                handleVerify();
+              }
+            }}
+            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm
                        focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <button
             type="button"
-            disabled={!stagingDate || logDates.includes(stagingDate)}
-            onClick={handleAddDate}
-            className="rounded-md bg-gray-600 px-3 py-2 text-sm font-medium text-white
-                       hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!isTicketValid || jiraStatus.state === "loading"}
+            onClick={handleVerify}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white
+                       hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            + Add
+            Verify
           </button>
         </div>
-        {logDates.length > 0 && (
-          <ul className="space-y-1">
-            {logDates.map((d) => (
-              <li
-                key={d}
-                className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 text-sm"
-              >
-                <span className="text-gray-800">{formatDateDisplay(d)}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveDate(d)}
-                  className="ml-2 shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                  aria-label={`Remove date ${d}`}
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        </div>
-      </div>
-
-      {/* Summary banner */}
-      {stagedTickets.length > 0 && logDates.length > 0 && (
-        <>
-          <hr className="border-gray-100" />
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
-            <p className="font-medium text-blue-800">Will log:</p>
-            <p className="mt-1 text-blue-700">
-              {stagedTickets.map((t) => t.ticket).join(", ")}
-            </p>
-            <p className="text-blue-600">
-              on {logDates.map((d) => formatDateDisplay(d)).join(", ")}
-            </p>
-          </div>
-        </>
-      )}
-
-      <hr className="border-gray-100" />
-
-      {/* Status indicators */}
-      <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Status</p>
         <StatusIndicator
           label="Jira"
           status={jiraStatus.state}
@@ -386,36 +310,7 @@ export default function LogForm() {
                 : undefined
           }
         />
-        <StatusIndicator
-          label="TSC Log"
-          status={logStatus.state}
-          message={
-            logStatus.state === "success" || logStatus.state === "error"
-              ? logStatus.message
-              : logStatus.state === "loading"
-                ? "Writing to Excel... (browser will open briefly)"
-                : undefined
-          }
-        />
-        <StatusIndicator
-          label="HRM Log"
-          status={hrmStatus.state}
-          message={
-            hrmStatus.state === "success" || hrmStatus.state === "error"
-              ? hrmStatus.message
-              : hrmStatus.state === "loading"
-                ? "Logging to HRM... (browser will open briefly)"
-                : undefined
-          }
-        />
-      </div>
-
-      {/* Staged ticket list */}
-      {stagedTickets.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-700">
-            Staged Tickets ({stagedTickets.length}/{MAX_HRM_TICKETS}):
-          </p>
+        {stagedTickets.length > 0 && (
           <ul className="space-y-1">
             {stagedTickets.map((item) => {
               const description = item.summary.slice(item.ticket.length + 3);
@@ -442,6 +337,101 @@ export default function LogForm() {
               );
             })}
           </ul>
+        )}
+      </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Dates section */}
+      <div className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Dates</p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <label htmlFor="log-date" className="text-sm font-medium text-gray-700">
+              Date:
+            </label>
+            <input
+              id="log-date"
+              type="date"
+              value={stagingDate}
+              min={min}
+              max={max}
+              onChange={handleStagingDateChange}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm
+                         focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            <button
+              type="button"
+              disabled={!stagingDate || logDates.includes(stagingDate)}
+              onClick={handleAddDate}
+              className="rounded-md bg-gray-600 px-3 py-2 text-sm font-medium text-white
+                         hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              + Add
+            </button>
+          </div>
+          {logDates.length > 0 && (
+            <ul className="space-y-1">
+              {logDates.map((d) => (
+                <li
+                  key={d}
+                  className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-1.5 text-sm"
+                >
+                  <span className="text-gray-800">{formatDateDisplay(d)}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveDate(d)}
+                    className="ml-2 shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                    aria-label={`Remove date ${d}`}
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <hr className="border-gray-100" />
+
+      {/* Status indicators — TSC + HRM only */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Status</p>
+        <StatusIndicator
+          label="TSC Log"
+          status={logStatus.state}
+          message={
+            logStatus.state === "success" || logStatus.state === "error"
+              ? logStatus.message
+              : logStatus.state === "loading"
+                ? "Writing to Excel... (browser will open briefly)"
+                : undefined
+          }
+        />
+        <StatusIndicator
+          label="HRM Log"
+          status={hrmStatus.state}
+          message={
+            hrmStatus.state === "success" || hrmStatus.state === "error"
+              ? hrmStatus.message
+              : hrmStatus.state === "loading"
+                ? "Logging to HRM... (browser will open briefly)"
+                : undefined
+          }
+        />
+      </div>
+
+      {/* Summary banner — below Status */}
+      {stagedTickets.length > 0 && logDates.length > 0 && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
+          <p className="font-medium text-blue-800">Will log:</p>
+          <p className="mt-1 text-blue-700">
+            {stagedTickets.map((t) => t.ticket).join(", ")}
+          </p>
+          <p className="text-blue-600">
+            on {logDates.map((d) => formatDateDisplay(d)).join(", ")}
+          </p>
         </div>
       )}
 

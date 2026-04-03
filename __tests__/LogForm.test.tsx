@@ -505,7 +505,6 @@ describe("LogForm -- HRM ticket list", () => {
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Staged Tickets \(1\/5\)/)).toBeInTheDocument();
   });
 
   it("removes a ticket from the HRM list", async () => {
@@ -515,7 +514,7 @@ describe("LogForm -- HRM ticket list", () => {
     expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
-    expect(screen.queryByText(/Staged Tickets/)).not.toBeInTheDocument();
+    expect(screen.queryByText("MDP-1234")).not.toBeInTheDocument();
   });
 
   it("prevents adding duplicate tickets", async () => {
@@ -530,7 +529,7 @@ describe("LogForm -- HRM ticket list", () => {
     await typeTicket(user, "MDP-1234");
     await user.click(screen.getByRole("button", { name: /verify/i }));
     await waitFor(() =>
-      expect(screen.getByText(/Staged Tickets/)).toBeInTheDocument()
+      expect(screen.getAllByRole("button", { name: /remove MDP-1234/i })).toHaveLength(1)
     );
 
     // Only one remove button for MDP-1234 means only one entry in the staged list
@@ -887,6 +886,37 @@ describe("LogForm -- Log All parallel execution", () => {
   it("hides summary banner when staged tickets list is empty", () => {
     render(<LogForm />);
     expect(screen.queryByText(/will log/i)).not.toBeInTheDocument();
+  });
+
+  it("shows Jira status below the verify button, not in the Status section", () => {
+    render(<LogForm />);
+
+    // "Jira:" label is always rendered by StatusIndicator (even in idle state)
+    // It should appear before the "Dates" heading (i.e. inside the Tickets section)
+    const jiraLabel = screen.getByText("Jira:");
+    const datesHeading = screen.getByText("Dates");
+    expect(jiraLabel.compareDocumentPosition(datesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows summary banner below the Status section", async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ valid: true, summary: "Fix login bug" }),
+    }) as jest.Mock;
+
+    render(<LogForm />);
+
+    fireEvent.change(screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678"), {
+      target: { value: "MDP-1234" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /verify/i }));
+
+    await waitFor(() => {
+      const statusHeading = screen.getByText("Status");
+      const banner = screen.getByText(/will log/i);
+      // Banner appears after Status heading in DOM
+      expect(statusHeading.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
   });
 
   it("resets both statuses to idle when ticket input changes after Log All", async () => {
