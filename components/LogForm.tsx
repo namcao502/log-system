@@ -191,7 +191,7 @@ export default function LogForm() {
     } catch {
       setLogStatus({ state: "error", message: "Failed to write to Excel" });
     }
-  }, [ticket, stagedTickets, logDates, jiraStatus.state]);
+  }, [ticket, stagedTickets, logDates, jiraStatus.state, isLogging]);
 
   const handleLogHrm = useCallback(async () => {
     if (stagedTickets.length === 0 || isLogging) return;
@@ -216,7 +216,7 @@ export default function LogForm() {
     } catch {
       setHrmStatus({ state: "error", message: "Failed to reach HRM" });
     }
-  }, [stagedTickets, logDates]);
+  }, [stagedTickets, logDates, isLogging]);
 
   const handleLogAll = useCallback(async () => {
     if (jiraStatus.state !== "success" || stagedTickets.length === 0 || isLogging) return;
@@ -262,7 +262,7 @@ export default function LogForm() {
         }
       })(),
     ]);
-  }, [logDates, jiraStatus.state, stagedTickets, logStatus.state, hrmStatus.state]);
+  }, [logDates, jiraStatus.state, stagedTickets, logStatus.state, hrmStatus.state, isLogging]);
 
   const logAllLabel = `Log All — ${stagedTickets.length} ticket${stagedTickets.length !== 1 ? "s" : ""} × ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
 
