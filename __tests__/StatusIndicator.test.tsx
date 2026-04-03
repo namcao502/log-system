@@ -3,6 +3,9 @@
  *
  * Covers:
  * - Renders label text for all states.
+ * - Log toggle: no button when logs undefined or empty.
+ * - Log toggle: button shows line count when logs present.
+ * - Log toggle: clicking expands/collapses log lines.
  * - Idle state: grey dot, no message.
  * - Loading state: spinner element, optional message.
  * - Success state: checkmark character, message in green.
@@ -128,5 +131,67 @@ describe("StatusIndicator -- message prop", () => {
     // Should have label span + checkmark span = 2
     const spans = container.querySelectorAll("span");
     expect(spans.length).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Log toggle
+// ---------------------------------------------------------------------------
+
+import userEvent from "@testing-library/user-event";
+
+describe("StatusIndicator -- log toggle", () => {
+  it("renders no toggle button when logs prop is undefined", () => {
+    renderIndicator({ status: "success", message: "OK" });
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("renders no toggle button when logs is an empty array", () => {
+    renderIndicator({ status: "success", message: "OK", logs: [] });
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("renders a toggle button showing line count when logs are present", () => {
+    renderIndicator({
+      status: "success",
+      message: "OK",
+      logs: ["[browser-log] [0.0s] Browser launched", "[browser-log] [2.1s] Done!"],
+    });
+    expect(screen.getByRole("button", { name: /2 lines/i })).toBeInTheDocument();
+  });
+
+  it("does not show log lines before toggle is clicked", () => {
+    renderIndicator({
+      status: "success",
+      message: "OK",
+      logs: ["[browser-log] [0.0s] Browser launched"],
+    });
+    expect(screen.queryByText("[browser-log] [0.0s] Browser launched")).not.toBeInTheDocument();
+  });
+
+  it("shows log lines after toggle button is clicked", async () => {
+    const user = userEvent.setup();
+    renderIndicator({
+      status: "success",
+      message: "OK",
+      logs: ["[browser-log] [0.0s] Browser launched", "[browser-log] [2.1s] Done!"],
+    });
+    await user.click(screen.getByRole("button", { name: /2 lines/i }));
+    expect(screen.getByText(/Browser launched/)).toBeInTheDocument();
+    expect(screen.getByText(/Done!/)).toBeInTheDocument();
+  });
+
+  it("hides log lines when toggle is clicked a second time", async () => {
+    const user = userEvent.setup();
+    renderIndicator({
+      status: "success",
+      message: "OK",
+      logs: ["[browser-log] [0.0s] Browser launched"],
+    });
+    const btn = screen.getByRole("button", { name: /1 line/i });
+    await user.click(btn);
+    expect(screen.getByText(/Browser launched/)).toBeInTheDocument();
+    await user.click(btn);
+    expect(screen.queryByText(/Browser launched/)).not.toBeInTheDocument();
   });
 });
