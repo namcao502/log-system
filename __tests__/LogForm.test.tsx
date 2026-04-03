@@ -722,12 +722,12 @@ describe("LogForm -- Log All button disabled states", () => {
     expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
   });
 
-  it("is disabled when HRM has tickets but Jira is not verified", async () => {
+  it("is disabled when staged list is empty", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
-    // Clear the current ticket to lose jira verification
-    await typeTicket(user, "MDP-9999");
+    // Remove the staged ticket — Log All should become disabled
+    await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
     expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
   });
 

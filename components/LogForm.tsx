@@ -169,11 +169,9 @@ export default function LogForm() {
   }, [hrmStatus.state]);
 
   const handleLogTsc = useCallback(async () => {
-    if (jiraStatus.state !== "success" || isLogging) return;
+    if (stagedTickets.length === 0 || isLogging) return;
 
-    const tscTicket = stagedTickets.length > 0
-      ? stagedTickets.map((t) => t.ticket).join(", ")
-      : ticket;
+    const tscTicket = stagedTickets.map((t) => t.ticket).join(", ");
 
     setLogStatus({ state: "loading" });
     try {
@@ -191,7 +189,7 @@ export default function LogForm() {
     } catch {
       setLogStatus({ state: "error", message: "Failed to write to Excel" });
     }
-  }, [ticket, stagedTickets, logDates, jiraStatus.state, isLogging]);
+  }, [stagedTickets, logDates, isLogging]);
 
   const handleLogHrm = useCallback(async () => {
     if (stagedTickets.length === 0 || isLogging) return;
@@ -219,7 +217,7 @@ export default function LogForm() {
   }, [stagedTickets, logDates, isLogging]);
 
   const handleLogAll = useCallback(async () => {
-    if (jiraStatus.state !== "success" || stagedTickets.length === 0 || isLogging) return;
+    if (stagedTickets.length === 0 || isLogging) return;
 
     setLogStatus({ state: "loading" });
     setHrmStatus({ state: "loading" });
@@ -262,7 +260,7 @@ export default function LogForm() {
         }
       })(),
     ]);
-  }, [logDates, jiraStatus.state, stagedTickets, isLogging]);
+  }, [logDates, stagedTickets, isLogging]);
 
   const logAllLabel = `Log All — ${stagedTickets.length} ticket${stagedTickets.length !== 1 ? "s" : ""} × ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
 
@@ -441,7 +439,7 @@ export default function LogForm() {
       <div className="flex flex-col gap-3">
         <button
           type="button"
-          disabled={jiraStatus.state !== "success" || logDates.length === 0 || isLogging}
+          disabled={stagedTickets.length === 0 || logDates.length === 0 || isLogging}
           onClick={handleLogTsc}
           className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white
                      hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -459,7 +457,7 @@ export default function LogForm() {
         </button>
         <button
           type="button"
-          disabled={jiraStatus.state !== "success" || stagedTickets.length === 0 || isLogging}
+          disabled={stagedTickets.length === 0 || isLogging}
           onClick={handleLogAll}
           className="w-full rounded-md bg-purple-600 px-4 py-2.5 text-sm font-medium text-white
                      hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
