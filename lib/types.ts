@@ -8,6 +8,7 @@ export interface LogResponse {
   success: boolean;
   cell?: string;
   error?: string;
+  logs?: string[];
 }
 
 export interface LogRequestBody {
@@ -23,4 +24,5 @@ export interface HrmLogRequestBody {
 export interface HrmLogResponse {
   success: boolean;
   error?: string;
+  logs?: string[];
 }
