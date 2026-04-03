@@ -67,6 +67,8 @@ export default function LogForm() {
   const [jiraFading, setJiraFading] = useState(false);
   const [logFading, setLogFading] = useState(false);
   const [hrmFading, setHrmFading] = useState(false);
+  const [tscLogs, setTscLogs] = useState<string[]>([]);
+  const [hrmLogs, setHrmLogs] = useState<string[]>([]);
 
   const isTicketValid = INPUT_REGEX.test(ticket.trim());
   const { min, max } = getCurrentYearBounds();
@@ -208,6 +210,7 @@ export default function LogForm() {
     const tscTicket = stagedTickets.map((t) => t.ticket).join(", ");
 
     setLogStatus({ state: "loading" });
+    setTscLogs([]);
     try {
       const res = await fetch("/api/sharepoint/log", {
         method: "POST",
@@ -217,9 +220,11 @@ export default function LogForm() {
       const data = (await res.json()) as LogResponse;
       if (data.success) {
         setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${data.cell ?? "O"}` });
+        setTscLogs(data.logs ?? []);
         setStagedTickets([]);
       } else {
         setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
+        setTscLogs(data.logs ?? []);
       }
     } catch {
       setLogStatus({ state: "error", message: "Failed to write to Excel" });
@@ -230,6 +235,7 @@ export default function LogForm() {
     if (stagedTickets.length === 0 || isLogging) return;
 
     setHrmStatus({ state: "loading" });
+    setHrmLogs([]);
     try {
       const res = await fetch("/api/hrm/log", {
         method: "POST",
@@ -243,9 +249,11 @@ export default function LogForm() {
       if (data.success) {
         const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
         setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
+        setHrmLogs(data.logs ?? []);
         setStagedTickets([]);
       } else {
         setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
+        setHrmLogs(data.logs ?? []);
       }
     } catch {
       setHrmStatus({ state: "error", message: "Failed to reach HRM" });
@@ -257,6 +265,8 @@ export default function LogForm() {
 
     setLogStatus({ state: "loading" });
     setHrmStatus({ state: "loading" });
+    setTscLogs([]);
+    setHrmLogs([]);
 
     await Promise.all([
       (async () => {
@@ -270,9 +280,11 @@ export default function LogForm() {
           const data = (await res.json()) as LogResponse;
           if (data.success) {
             setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${data.cell ?? "O"}` });
+            setTscLogs(data.logs ?? []);
             setStagedTickets([]);
           } else {
             setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
+            setTscLogs(data.logs ?? []);
           }
         } catch {
           setLogStatus({ state: "error", message: "Failed to write to Excel" });
@@ -289,9 +301,11 @@ export default function LogForm() {
           if (data.success) {
             const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
             setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
+            setHrmLogs(data.logs ?? []);
             setStagedTickets([]);
           } else {
             setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
+            setHrmLogs(data.logs ?? []);
           }
         } catch {
           setHrmStatus({ state: "error", message: "Failed to reach HRM" });
@@ -454,6 +468,7 @@ export default function LogForm() {
           label="TSC Log"
           status={logStatus.state}
           fading={logFading}
+          logs={tscLogs}
           message={
             logStatus.state === "success" || logStatus.state === "error"
               ? logStatus.message
@@ -466,6 +481,7 @@ export default function LogForm() {
           label="HRM Log"
           status={hrmStatus.state}
           fading={hrmFading}
+          logs={hrmLogs}
           message={
             hrmStatus.state === "success" || hrmStatus.state === "error"
               ? hrmStatus.message

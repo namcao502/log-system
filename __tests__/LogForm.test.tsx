@@ -948,3 +948,87 @@ describe("LogForm -- Log All parallel execution", () => {
     expect(screen.queryByText(/Logged MDP-1234 to HRM/)).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Log banner after TSC / HRM operations
+// ---------------------------------------------------------------------------
+
+describe("LogForm -- log banner", () => {
+  it("shows log toggle on TSC Log row after successful log", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+
+    // Verify a ticket
+    mockFetch.mockReturnValueOnce(jsonResponse({ valid: true, summary: "Fix login bug" }));
+    await typeTicket(user, "MDP-1234");
+    await user.click(screen.getByRole("button", { name: /verify/i }));
+    await waitFor(() => expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0));
+
+    // Log TSC — response includes logs
+    mockFetch.mockReturnValueOnce(
+      jsonResponse({
+        success: true,
+        cell: "M95",
+        logs: ["[browser-log] [0.0s] Browser launched", "[browser-log] [2.1s] Done!"],
+      })
+    );
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /2 lines/i })).toBeInTheDocument()
+    );
+  });
+
+  it("shows log toggle on HRM Log row after successful HRM log", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+
+    // Verify a ticket
+    mockFetch.mockReturnValueOnce(jsonResponse({ valid: true, summary: "Fix login bug" }));
+    await typeTicket(user, "MDP-1234");
+    await user.click(screen.getByRole("button", { name: /verify/i }));
+    await waitFor(() => expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0));
+
+    // Log HRM — response includes logs
+    mockFetch.mockReturnValueOnce(
+      jsonResponse({
+        success: true,
+        logs: ["[hrm-log] [0.0s] Browser launched", "[hrm-log] [3.2s] Done!"],
+      })
+    );
+    await user.click(screen.getByRole("button", { name: /log hrm/i }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /2 lines/i })).toBeInTheDocument()
+    );
+  });
+
+  it("resets logs when a new TSC log operation starts", async () => {
+    const user = userEvent.setup();
+    render(<LogForm />);
+
+    // First verify + log (returns 1 log line)
+    mockFetch.mockReturnValueOnce(jsonResponse({ valid: true, summary: "Fix login bug" }));
+    await typeTicket(user, "MDP-1234");
+    await user.click(screen.getByRole("button", { name: /verify/i }));
+    await waitFor(() => expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0));
+
+    mockFetch.mockReturnValueOnce(
+      jsonResponse({ success: true, cell: "M95", logs: ["[browser-log] [0.0s] Browser launched"] })
+    );
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /1 line/i })).toBeInTheDocument()
+    );
+
+    // Second verify + log (returns no logs) — toggle should disappear
+    mockFetch.mockReturnValueOnce(jsonResponse({ valid: true, summary: "Other bug" }));
+    await typeTicket(user, "MDP-5678");
+    await user.click(screen.getByRole("button", { name: /verify/i }));
+    await waitFor(() => expect(screen.getAllByText("MDP-5678").length).toBeGreaterThan(0));
+
+    mockFetch.mockReturnValueOnce(jsonResponse({ success: true, cell: "M96" }));
+    await user.click(screen.getByRole("button", { name: /log tsc/i }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /lines/i })).not.toBeInTheDocument()
+    );
+  });
+});
