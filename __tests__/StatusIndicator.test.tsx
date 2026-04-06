@@ -3,9 +3,9 @@
  *
  * Covers:
  * - Renders label text for all states.
- * - Log toggle: no button when logs undefined or empty.
- * - Log toggle: button shows line count when logs present.
- * - Log toggle: clicking expands/collapses log lines.
+ * - Logs: no panel rendered when logs prop is undefined or empty array.
+ * - Logs: log lines render immediately when logs are present, no click needed.
+ * - Logs: no toggle button present regardless of log content.
  * - Idle state: grey dot, no message.
  * - Loading state: spinner element, optional message.
  * - Success state: checkmark character, message in green.
