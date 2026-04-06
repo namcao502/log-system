@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import type { ReactNode } from "react";
 
 type Status = "idle" | "loading" | "success" | "error";
 
@@ -12,8 +12,7 @@ interface StatusIndicatorProps {
   logs?: string[];
 }
 
-function colorizeLogLine(line: string): React.ReactNode {
-  // Match: [prefix] [N.Ns] rest   OR   [prefix] rest
+function colorizeLogLine(line: string): ReactNode {
   const match = line.match(/^(\[[^\]]+\])( \[\d+\.\d+s\])?(.*)$/);
   if (!match) return <span className="text-slate-400">{line}</span>;
   const [, prefix, timestamp, rest] = match;
@@ -33,7 +32,6 @@ export default function StatusIndicator({
   fading = false,
   logs,
 }: StatusIndicatorProps) {
-  const [expanded, setExpanded] = useState(false);
   const hasLogs = logs !== undefined && logs.length > 0;
 
   return (
@@ -80,21 +78,10 @@ export default function StatusIndicator({
             {message}
           </span>
         )}
-
-        {hasLogs && (
-          <button
-            type="button"
-            onClick={() => setExpanded((prev) => !prev)}
-            className="ml-auto shrink-0 text-xs text-slate-500 hover:text-slate-300"
-            aria-label={`${logs.length} line${logs.length !== 1 ? "s" : ""} ${expanded ? "collapse" : "expand"}`}
-          >
-            [{logs.length} line{logs.length !== 1 ? "s" : ""}] {expanded ? "▴" : "▾"}
-          </button>
-        )}
       </div>
 
-      {hasLogs && expanded && (
-        <pre className="mt-1.5 max-h-48 overflow-y-auto rounded-lg bg-slate-950 px-3 py-2 text-xs leading-relaxed">
+      {hasLogs && (
+        <pre className="mt-1.5 h-[211px] overflow-y-auto rounded-lg bg-slate-950 px-3 py-2 text-xs leading-relaxed">
           {logs.map((line, i) => (
             <div key={i}>{colorizeLogLine(line)}</div>
           ))}
