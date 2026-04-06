@@ -390,147 +390,147 @@ export default function LogForm() {
   return (
     <div className="space-y-2.5">
       <div className="grid grid-cols-2 gap-2.5">
-      {/* Tickets card */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
-            {stagedTickets.length > 0 ? `Tickets (${stagedTickets.length}/5)` : "Tickets"}
-          </p>
-          {stagedTickets.length > 0 && (
+        {/* Tickets card */}
+        <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+              {stagedTickets.length > 0 ? `Tickets (${stagedTickets.length}/5)` : "Tickets"}
+            </p>
+            {stagedTickets.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setStagedTickets([])}
+                className="text-xs text-slate-500 hover:text-red-400"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <label htmlFor="ticket" className="text-sm font-medium text-slate-400">
+              Ticket:
+            </label>
+            <input
+              id="ticket"
+              type="text"
+              placeholder="MDP-1234 or MDP-1234, MDP-5678"
+              value={ticket}
+              onChange={handleTicketChange}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && isTicketValid && jiraStatus.state !== "loading") {
+                  handleVerify();
+                }
+              }}
+              className={`flex-1 rounded-lg border bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 ${
+                showFormatError
+                  ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                  : "border-slate-700 focus:border-blue-500 focus:ring-blue-500"
+              }`}
+            />
             <button
               type="button"
-              onClick={() => setStagedTickets([])}
-              className="text-xs text-slate-500 hover:text-red-400"
+              disabled={!isTicketValid || jiraStatus.state === "loading"}
+              onClick={handleVerify}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white
+                         active:scale-95 transition-transform duration-100
+                         hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Clear All
+              Verify
             </button>
+          </div>
+          {showFormatError && (
+            <p className="text-xs text-red-400">Use MDP-xxxx format</p>
+          )}
+          <StatusIndicator
+            label="Jira"
+            status={jiraStatus.state}
+            fading={jiraFading}
+            message={
+              jiraStatus.state === "success" || jiraStatus.state === "error"
+                ? jiraStatus.message
+                : jiraStatus.state === "loading"
+                  ? "Verifying..."
+                  : undefined
+            }
+          />
+          {stagedTickets.length > 0 && (
+            <ul className="space-y-1.5">
+              {stagedTickets.map((item) => {
+                const description = item.summary.slice(item.ticket.length + 3);
+                return (
+                  <li
+                    key={item.ticket}
+                    className={`flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm transition-all duration-150 ${
+                      exitingTickets.has(item.ticket) ? "opacity-0 -translate-y-1.5" : "animate-slide-in"
+                    }`}
+                  >
+                    <span className="flex flex-col min-w-0">
+                      <span className="font-medium text-slate-200">{item.ticket}</span>
+                      {description && (
+                        <span className="truncate text-xs text-slate-500">{description}</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFromStaged(item.ticket)}
+                      className="ml-3 shrink-0 rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-red-400"
+                      aria-label={`Remove ${item.ticket}`}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <label htmlFor="ticket" className="text-sm font-medium text-slate-400">
-            Ticket:
-          </label>
-          <input
-            id="ticket"
-            type="text"
-            placeholder="MDP-1234 or MDP-1234, MDP-5678"
-            value={ticket}
-            onChange={handleTicketChange}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && isTicketValid && jiraStatus.state !== "loading") {
-                handleVerify();
-              }
-            }}
-            className={`flex-1 rounded-lg border bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 ${
-              showFormatError
-                ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                : "border-slate-700 focus:border-blue-500 focus:ring-blue-500"
-            }`}
-          />
-          <button
-            type="button"
-            disabled={!isTicketValid || jiraStatus.state === "loading"}
-            onClick={handleVerify}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white
-                       active:scale-95 transition-transform duration-100
-                       hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Verify
-          </button>
-        </div>
-        {showFormatError && (
-          <p className="text-xs text-red-400">Use MDP-xxxx format</p>
-        )}
-        <StatusIndicator
-          label="Jira"
-          status={jiraStatus.state}
-          fading={jiraFading}
-          message={
-            jiraStatus.state === "success" || jiraStatus.state === "error"
-              ? jiraStatus.message
-              : jiraStatus.state === "loading"
-                ? "Verifying..."
-                : undefined
-          }
-        />
-        {stagedTickets.length > 0 && (
-          <ul className="space-y-1.5">
-            {stagedTickets.map((item) => {
-              const description = item.summary.slice(item.ticket.length + 3);
-              return (
+
+        {/* Dates card */}
+        <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Dates</p>
+          <div className="flex items-center gap-3">
+            <label htmlFor="log-date" className="text-sm font-medium text-slate-400">
+              Date:
+            </label>
+            <DatePickerPopover
+              id="log-date"
+              value={stagingDate}
+              onChange={handleStagingDateChange}
+              min={min}
+              max={max}
+            />
+            <button
+              type="button"
+              disabled={!stagingDate || logDates.includes(stagingDate)}
+              onClick={handleAddDate}
+              className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-300
+                         active:scale-95 transition-transform duration-100
+                         hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              + Add
+            </button>
+          </div>
+          {logDates.length > 0 && (
+            <ul className="space-y-1.5">
+              {logDates.map((d) => (
                 <li
-                  key={item.ticket}
-                  className={`flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm transition-all duration-150 ${
-                    exitingTickets.has(item.ticket) ? "opacity-0 -translate-y-1.5" : "animate-slide-in"
-                  }`}
+                  key={d}
+                  className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
                 >
-                  <span className="flex flex-col min-w-0">
-                    <span className="font-medium text-slate-200">{item.ticket}</span>
-                    {description && (
-                      <span className="truncate text-xs text-slate-500">{description}</span>
-                    )}
-                  </span>
+                  <span className="text-slate-300">{formatDateDisplay(d)}</span>
                   <button
                     type="button"
-                    onClick={() => handleRemoveFromStaged(item.ticket)}
-                    className="ml-3 shrink-0 rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-red-400"
-                    aria-label={`Remove ${item.ticket}`}
+                    onClick={() => handleRemoveDate(d)}
+                    className="ml-2 shrink-0 rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-red-400"
+                    aria-label={`Remove date ${d}`}
                   >
                     ✕
                   </button>
                 </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      {/* Dates card */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Dates</p>
-        <div className="flex items-center gap-3">
-          <label htmlFor="log-date" className="text-sm font-medium text-slate-400">
-            Date:
-          </label>
-          <DatePickerPopover
-            id="log-date"
-            value={stagingDate}
-            onChange={handleStagingDateChange}
-            min={min}
-            max={max}
-          />
-          <button
-            type="button"
-            disabled={!stagingDate || logDates.includes(stagingDate)}
-            onClick={handleAddDate}
-            className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-300
-                       active:scale-95 transition-transform duration-100
-                       hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            + Add
-          </button>
+              ))}
+            </ul>
+          )}
         </div>
-        {logDates.length > 0 && (
-          <ul className="space-y-1.5">
-            {logDates.map((d) => (
-              <li
-                key={d}
-                className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-              >
-                <span className="text-slate-300">{formatDateDisplay(d)}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveDate(d)}
-                  className="ml-2 shrink-0 rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-red-400"
-                  aria-label={`Remove date ${d}`}
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
       </div>
 
       {/* Status card */}
