@@ -996,7 +996,7 @@ describe("LogForm -- Log All parallel execution", () => {
 // ---------------------------------------------------------------------------
 
 describe("LogForm -- log banner", () => {
-  it("shows log toggle on TSC Log row after successful log", async () => {
+  it("shows log lines on TSC Log row after successful log", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
 
@@ -1016,11 +1016,12 @@ describe("LogForm -- log banner", () => {
     );
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /2 lines/i })).toBeInTheDocument()
+      expect(screen.getByText(/Browser launched/)).toBeInTheDocument()
     );
+    expect(screen.getByText(/Done!/)).toBeInTheDocument();
   });
 
-  it("shows log toggle on HRM Log row after successful HRM log", async () => {
+  it("shows log lines on HRM Log row after successful HRM log", async () => {
     const user = userEvent.setup();
     render(<LogForm />);
 
@@ -1040,8 +1041,9 @@ describe("LogForm -- log banner", () => {
     );
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /2 lines/i })).toBeInTheDocument()
+      expect(screen.getByText(/Browser launched/)).toBeInTheDocument()
     );
+    expect(screen.getByText(/Done!/)).toBeInTheDocument();
   });
 
   it("resets logs when a new TSC log operation starts", async () => {
@@ -1062,10 +1064,10 @@ describe("LogForm -- log banner", () => {
     );
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /1 line/i })).toBeInTheDocument()
+      expect(screen.getByText(/Browser launched/)).toBeInTheDocument()
     );
 
-    // Second verify + log (returns no logs) — toggle should disappear
+    // Second verify + log (returns no logs) — log panel should disappear
     mockFetch.mockReturnValueOnce(jsonResponse({ valid: true, summary: "Other bug" }));
     await typeTicket(user, "MDP-5678");
     await user.click(screen.getByRole("button", { name: /verify/i }));
@@ -1076,7 +1078,7 @@ describe("LogForm -- log banner", () => {
     );
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /lines/i })).not.toBeInTheDocument()
+      expect(screen.queryByText(/Browser launched/)).not.toBeInTheDocument()
     );
   });
 });

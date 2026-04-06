@@ -389,6 +389,7 @@ export default function LogForm() {
 
   return (
     <div className="space-y-2.5">
+      <div className="grid grid-cols-2 gap-2.5">
       {/* Tickets card */}
       <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -530,36 +531,44 @@ export default function LogForm() {
           </ul>
         )}
       </div>
+      </div>
 
       {/* Status card */}
       <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Status</p>
-        <StatusIndicator
-          label="TSC Log"
-          status={logStatus.state}
-          fading={logFading}
-          logs={tscLogs}
-          message={
-            logStatus.state === "success" || logStatus.state === "error"
-              ? logStatus.message
-              : logStatus.state === "loading"
-                ? "Writing to Excel... (browser will open briefly)"
-                : undefined
-          }
-        />
-        <StatusIndicator
-          label="HRM Log"
-          status={hrmStatus.state}
-          fading={hrmFading}
-          logs={hrmLogs}
-          message={
-            hrmStatus.state === "success" || hrmStatus.state === "error"
-              ? hrmStatus.message
-              : hrmStatus.state === "loading"
-                ? "Logging to HRM... (browser will open briefly)"
-                : undefined
-          }
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <StatusIndicator
+            label="TSC Log"
+            status={logStatus.state}
+            fading={logFading}
+            logs={tscLogs}
+            message={
+              logStatus.state === "success" || logStatus.state === "error"
+                ? logStatus.message
+                : logStatus.state === "loading"
+                  ? "Writing to Excel... (browser will open briefly)"
+                  : undefined
+            }
+          />
+          <StatusIndicator
+            label="HRM Log"
+            status={hrmStatus.state}
+            fading={hrmFading}
+            logs={hrmLogs}
+            message={
+              hrmStatus.state === "success" || hrmStatus.state === "error"
+                ? hrmStatus.message
+                : hrmStatus.state === "loading"
+                  ? "Logging to HRM... (browser will open briefly)"
+                  : undefined
+            }
+          />
+        </div>
+      </div>
+
+      {/* Actions card */}
+      <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Actions</p>
         {stagedTickets.length > 0 && logDates.length > 0 && (
           <div className="rounded-lg border border-blue-900/50 border-l-[3px] border-l-blue-500 bg-blue-950/30 px-4 py-3 text-sm">
             <p className="font-medium text-blue-300">Will log:</p>
@@ -571,32 +580,29 @@ export default function LogForm() {
             </p>
           </div>
         )}
-      </div>
-
-      {/* Actions card */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Actions</p>
         <div className="flex flex-col gap-2.5">
-          <button
-            type="button"
-            disabled={stagedTickets.length === 0 || logDates.length === 0 || isLogging}
-            onClick={handleLogTsc}
-            className="w-full rounded-lg border border-blue-600 bg-transparent px-4 py-2.5 text-sm font-medium text-blue-400
-                       active:scale-95 transition-transform duration-100
-                       hover:bg-blue-950 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Log TSC
-          </button>
-          <button
-            type="button"
-            disabled={stagedTickets.length === 0 || isLogging}
-            onClick={handleLogHrm}
-            className="w-full rounded-lg border border-teal-600 bg-transparent px-4 py-2.5 text-sm font-medium text-teal-400
-                       active:scale-95 transition-transform duration-100
-                       hover:bg-teal-950 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Log HRM ({stagedTickets.length})
-          </button>
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              disabled={stagedTickets.length === 0 || logDates.length === 0 || isLogging}
+              onClick={handleLogTsc}
+              className="rounded-lg border border-blue-600 bg-transparent px-4 py-2.5 text-sm font-medium text-blue-400
+                         active:scale-95 transition-transform duration-100
+                         hover:bg-blue-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Log TSC
+            </button>
+            <button
+              type="button"
+              disabled={stagedTickets.length === 0 || isLogging}
+              onClick={handleLogHrm}
+              className="rounded-lg border border-teal-600 bg-transparent px-4 py-2.5 text-sm font-medium text-teal-400
+                         active:scale-95 transition-transform duration-100
+                         hover:bg-teal-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Log HRM ({stagedTickets.length})
+            </button>
+          </div>
           <button
             type="button"
             disabled={stagedTickets.length === 0 || isLogging}
