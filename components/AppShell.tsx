@@ -1,0 +1,48 @@
+"use client";
+
+import { useCallback } from "react";
+import { useNotifications } from "@/lib/useNotifications";
+import { useToasts } from "@/lib/useToasts";
+import type { Notification } from "@/lib/types";
+import NotificationBell from "./NotificationBell";
+import ToastContainer from "./ToastContainer";
+import LogForm from "./LogForm";
+
+interface AppShellProps {
+  today: string;
+}
+
+export default function AppShell({ today }: AppShellProps) {
+  const { notifications, unreadCount, addNotification, markRead, clearAll } =
+    useNotifications();
+  const { toasts, addToast, dismissToast } = useToasts();
+
+  const notify = useCallback(
+    (n: Omit<Notification, "id" | "timestamp">) => {
+      addNotification(n);
+      addToast(n);
+    },
+    [addNotification, addToast]
+  );
+
+  return (
+    <>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">Welcome, Nam Nguyen</h1>
+          <p className="mt-1 text-sm text-gray-500">Today: {today}</p>
+        </div>
+        <NotificationBell
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onOpen={markRead}
+          onClearAll={clearAll}
+        />
+      </div>
+      <div className="mt-6">
+        <LogForm onNotify={notify} />
+      </div>
+    </>
+  );
+}

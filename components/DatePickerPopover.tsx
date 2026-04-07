@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { DayPicker } from "react-day-picker";
+import { LABELS } from "@/lib/constants";
 
 interface DatePickerPopoverProps {
   id?: string;
@@ -25,12 +26,13 @@ function toISO(date: Date): string {
 }
 
 function displayDate(str: string): string {
-  if (!str) return "Pick a date";
+  if (!str) return LABELS.PICK_A_DATE;
   const [y, m, d] = str.split("-").map(Number);
   return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
+    weekday: "long",
+    month: "long",
     day: "numeric",
+    year: "numeric",
   }).format(new Date(y, m - 1, d));
 }
 
@@ -69,7 +71,7 @@ export default function DatePickerPopover({
   const toDateBound = max ? toDate(max) : undefined;
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative w-full">
       {/* Hidden real input keeps tests and screen readers working */}
       <input
         id={id}
@@ -89,9 +91,9 @@ export default function DatePickerPopover({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200
-                   text-left min-w-[148px] hover:border-slate-600 transition-colors
-                   focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-800
+                   text-left transition-colors
+                   focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
       >
         {displayDate(value)}
       </button>
@@ -99,8 +101,8 @@ export default function DatePickerPopover({
       {open && (
         <div
           role="dialog"
-          aria-label="Date picker"
-          className="absolute left-0 top-full z-50 mt-1 rounded-xl border border-slate-700 bg-slate-800 p-3 shadow-2xl shadow-black/60"
+          aria-label={LABELS.DATE_PICKER_ARIA}
+          className="absolute left-0 top-full z-50 mt-1 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-3 shadow-xl shadow-black/10"
         >
           <DayPicker
             mode="single"
@@ -116,24 +118,24 @@ export default function DatePickerPopover({
               month: "w-full",
               month_caption:
                 "flex items-center justify-between mb-3 px-1",
-              caption_label: "text-sm font-semibold text-slate-200",
+              caption_label: "text-sm font-semibold text-gray-900",
               nav: "flex gap-1",
               button_previous:
-                "p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
+                "p-1.5 rounded-lg hover:bg-emerald-100 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
               button_next:
-                "p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
+                "p-1.5 rounded-lg hover:bg-emerald-100 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
               month_grid: "w-full border-collapse",
               weekdays: "",
               weekday:
-                "text-[11px] font-medium text-slate-500 w-9 text-center pb-2",
+                "text-[11px] font-medium text-gray-400 w-9 text-center pb-2",
               week: "",
               day: "text-center p-0.5",
               day_button:
-                "h-8 w-8 mx-auto rounded-lg text-sm text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition-colors flex items-center justify-center",
+                "h-8 w-8 mx-auto rounded-lg text-sm text-gray-700 hover:bg-emerald-100 hover:text-gray-900 transition-colors flex items-center justify-center",
               selected:
-                "[&>button]:!bg-blue-600 [&>button]:!text-white [&>button]:hover:!bg-blue-500",
+                "[&>button]:!bg-emerald-600 [&>button]:!text-white [&>button]:hover:!bg-emerald-500",
               today:
-                "[&>button]:font-bold [&>button]:text-blue-400",
+                "[&>button]:font-bold [&>button]:text-emerald-600",
               outside: "opacity-30",
               disabled:
                 "[&>button]:!opacity-20 [&>button]:cursor-not-allowed",

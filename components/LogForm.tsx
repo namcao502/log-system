@@ -1,24 +1,25 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import type { JiraVerifyResponse } from "@/lib/types";
-import StatusIndicator from "./StatusIndicator";
+import { useState, useCallback } from "react";
+import type { JiraVerifyResponse, Notification } from "@/lib/types";
+import { getTimeSlots } from "@/lib/time-slots";
+import { LABELS, NOTIFY } from "@/lib/constants";
+import LogPanel from "./LogPanel";
 import DatePickerPopover from "./DatePickerPopover";
-
-type AsyncStatus =
-  | { state: "idle" }
-  | { state: "loading" }
-  | { state: "success"; message: string }
-  | { state: "error"; message: string };
 
 interface HrmTicketItem {
   ticket: string;
   summary: string;
 }
 
+interface LogFormProps {
+  onNotify: (n: Omit<Notification, "id" | "timestamp">) => void;
+}
+
 const SINGLE_TICKET_REGEX = /^MDP-\d+$/;
 const INPUT_REGEX = /^MDP-\d+(,\s*MDP-\d+)*$/;
 const MAX_HRM_TICKETS = 5;
+const MAX_LOG_DATES = 5;
 
 function parseTickets(input: string): string[] {
   return input.split(/,\s*/).filter((t) => SINGLE_TICKET_REGEX.test(t));
@@ -31,7 +32,6 @@ function getTodayDateString(): string {
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(new Date());
-
   const year = parts.find((p) => p.type === "year")!.value;
   const month = parts.find((p) => p.type === "month")!.value;
   const day = parts.find((p) => p.type === "day")!.value;
@@ -41,9 +41,10 @@ function getTodayDateString(): string {
 function formatDateDisplay(dateStr: string): string {
   const [year, month, day] = dateStr.split("-").map(Number);
   return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
+    weekday: "long",
+    month: "long",
     day: "numeric",
+    year: "numeric",
   }).format(new Date(year, month - 1, day));
 }
 
@@ -85,50 +86,38 @@ async function readNdJsonStream(
       }
     }
   }
-  return { success: false, error: "Stream ended unexpectedly" };
+  return { success: false, error: NOTIFY.ERR_STREAM };
 }
 
-export default function LogForm() {
+export default function LogForm({ onNotify }: LogFormProps) {
   const [ticket, setTicket] = useState("");
   const [stagingDate, setStagingDate] = useState(getTodayDateString);
   const [logDates, setLogDates] = useState<string[]>(() => [getTodayDateString()]);
-  const [jiraStatus, setJiraStatus] = useState<AsyncStatus>({ state: "idle" });
-  const [logStatus, setLogStatus] = useState<AsyncStatus>({ state: "idle" });
-  const [hrmStatus, setHrmStatus] = useState<AsyncStatus>({ state: "idle" });
+  const [isJiraLoading, setIsJiraLoading] = useState(false);
+  const [isTscLogging, setIsTscLogging] = useState(false);
+  const [isHrmLogging, setIsHrmLogging] = useState(false);
   const [stagedTickets, setStagedTickets] = useState<HrmTicketItem[]>([]);
   const [exitingTickets, setExitingTickets] = useState<Set<string>>(new Set());
-  const [jiraFading, setJiraFading] = useState(false);
-  const [logFading, setLogFading] = useState(false);
-  const [hrmFading, setHrmFading] = useState(false);
   const [tscLogs, setTscLogs] = useState<string[]>([]);
   const [hrmLogs, setHrmLogs] = useState<string[]>([]);
 
+  const isLogging = isTscLogging || isHrmLogging;
   const isTicketValid = INPUT_REGEX.test(ticket.trim());
   const { min, max } = getCurrentYearBounds();
 
   const handleTicketChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setTicket(e.target.value.toUpperCase());
-      setJiraStatus({ state: "idle" });
-      setLogStatus({ state: "idle" });
-      setHrmStatus({ state: "idle" });
     },
     []
   );
 
-  const handleStagingDateChange = useCallback(
-    (value: string) => {
-      setStagingDate(value);
-      // When exactly one date is selected, update it in-place instead of requiring "+ Add"
-      if (logDates.length === 1) {
-        setLogDates([value]);
-      }
-    },
-    [logDates.length]
-  );
+  const handleStagingDateChange = useCallback((value: string) => {
+    setStagingDate(value);
+  }, []);
 
   const handleAddDate = useCallback(() => {
-    if (!stagingDate || logDates.includes(stagingDate)) return;
+    if (!stagingDate || logDates.includes(stagingDate) || logDates.length >= MAX_LOG_DATES) return;
     setLogDates((prev) => [...prev, stagingDate]);
   }, [stagingDate, logDates]);
 
@@ -137,14 +126,9 @@ export default function LogForm() {
   }, []);
 
   const handleVerify = useCallback(async () => {
-    if (!isTicketValid) return;
-
-    setJiraStatus({ state: "loading" });
-    setLogStatus({ state: "idle" });
-    setHrmStatus({ state: "idle" });
-
+    if (!isTicketValid || isJiraLoading) return;
+    setIsJiraLoading(true);
     const tickets = parseTickets(ticket);
-
     try {
       const results = await Promise.all(
         tickets.map(async (t) => {
@@ -153,25 +137,24 @@ export default function LogForm() {
           return { ticket: t, data };
         })
       );
-
       const invalid = results.filter((r) => !r.data.valid);
       if (invalid.length > 0) {
-        setJiraStatus({
-          state: "error",
-          message: `Invalid: ${invalid.map((r) => r.ticket).join(", ")}`,
+        onNotify({
+          type: "error",
+          title: NOTIFY.JIRA_FAILED,
+          detail: `Invalid: ${invalid.map((r) => r.ticket).join(", ")}`,
         });
         return;
       }
-
       const verified: HrmTicketItem[] = results.map((r) => ({
         ticket: r.ticket,
-        summary: `${r.ticket} — ${r.data.summary ?? "No summary"}`,
+        summary: `${r.ticket} — ${r.data.summary ?? LABELS.NO_SUMMARY}`,
       }));
-      setJiraStatus({
-        state: "success",
-        message: verified.map((v) => v.summary).join(" | "),
+      onNotify({
+        type: "info",
+        title: NOTIFY.JIRA_VERIFIED,
+        detail: verified.map((v) => v.summary).join(", "),
       });
-      // Auto-stage: append new tickets, skip duplicates, respect MAX_HRM_TICKETS
       setStagedTickets((prev) => {
         const existingIds = new Set(prev.map((t) => t.ticket));
         const toAdd = verified.filter((v) => !existingIds.has(v.ticket));
@@ -180,9 +163,11 @@ export default function LogForm() {
       });
       document.getElementById("log-date")?.focus();
     } catch {
-      setJiraStatus({ state: "error", message: "Failed to reach Jira API" });
+      onNotify({ type: "error", title: NOTIFY.JIRA_FAILED, detail: NOTIFY.ERR_JIRA_API });
+    } finally {
+      setIsJiraLoading(false);
     }
-  }, [ticket, isTicketValid]);
+  }, [ticket, isTicketValid, isJiraLoading, onNotify]);
 
   const handleRemoveFromStaged = useCallback((ticketId: string) => {
     setExitingTickets((prev) => new Set([...prev, ticketId]));
@@ -196,53 +181,11 @@ export default function LogForm() {
     }, 150);
   }, []);
 
-  const isLogging = logStatus.state === "loading" || hrmStatus.state === "loading";
-
-  useEffect(() => {
-    if (jiraStatus.state !== "success") return;
-    const fadeId = setTimeout(() => setJiraFading(true), 19500);
-    const clearId = setTimeout(() => {
-      setJiraStatus({ state: "idle" });
-      setJiraFading(false);
-    }, 20000);
-    return () => {
-      clearTimeout(fadeId);
-      clearTimeout(clearId);
-    };
-  }, [jiraStatus.state]);
-
-  useEffect(() => {
-    if (logStatus.state !== "success") return;
-    const fadeId = setTimeout(() => setLogFading(true), 9500);
-    const clearId = setTimeout(() => {
-      setLogStatus({ state: "idle" });
-      setLogFading(false);
-    }, 10000);
-    return () => {
-      clearTimeout(fadeId);
-      clearTimeout(clearId);
-    };
-  }, [logStatus.state]);
-
-  useEffect(() => {
-    if (hrmStatus.state !== "success") return;
-    const fadeId = setTimeout(() => setHrmFading(true), 9500);
-    const clearId = setTimeout(() => {
-      setHrmStatus({ state: "idle" });
-      setHrmFading(false);
-    }, 10000);
-    return () => {
-      clearTimeout(fadeId);
-      clearTimeout(clearId);
-    };
-  }, [hrmStatus.state]);
-
   const handleLogTsc = useCallback(async () => {
     if (stagedTickets.length === 0 || isLogging) return;
-
     const tscTicket = stagedTickets.map((t) => t.ticket).join(", ");
-
-    setLogStatus({ state: "loading" });
+    const tscSummary = stagedTickets.map((t) => t.summary).join(", ");
+    setIsTscLogging(true);
     setTscLogs([]);
     try {
       const res = await fetch("/api/sharepoint/log", {
@@ -252,31 +195,36 @@ export default function LogForm() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string };
-        setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
+        onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: data.error ?? NOTIFY.ERR_LOG });
         return;
       }
       if (!res.body) {
-        setLogStatus({ state: "error", message: "Failed to log" });
+        onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: NOTIFY.ERR_LOG });
         return;
       }
       const result = await readNdJsonStream(res.body, (line) =>
         setTscLogs((prev) => [...prev, line])
       );
       if (result.success) {
-        setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${result.cell ?? "O"}` });
+        onNotify({
+          type: "success",
+          title: NOTIFY.TSC_LOGGED,
+          detail: `${tscSummary} → cell ${result.cell ?? "?"}`,
+        });
         setStagedTickets([]);
       } else {
-        setLogStatus({ state: "error", message: result.error || "Failed to log" });
+        onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: result.error || NOTIFY.ERR_LOG });
       }
     } catch {
-      setLogStatus({ state: "error", message: "Failed to write to Excel" });
+      onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: NOTIFY.ERR_EXCEL });
+    } finally {
+      setIsTscLogging(false);
     }
-  }, [stagedTickets, logDates, isLogging]);
+  }, [stagedTickets, logDates, isLogging, onNotify]);
 
   const handleLogHrm = useCallback(async () => {
     if (stagedTickets.length === 0 || isLogging) return;
-
-    setHrmStatus({ state: "loading" });
+    setIsHrmLogging(true);
     setHrmLogs([]);
     try {
       const res = await fetch("/api/hrm/log", {
@@ -289,11 +237,11 @@ export default function LogForm() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string };
-        setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
+        onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: data.error ?? NOTIFY.ERR_HRM });
         return;
       }
       if (!res.body) {
-        setHrmStatus({ state: "error", message: "Failed to log to HRM" });
+        onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: NOTIFY.ERR_HRM });
         return;
       }
       const result = await readNdJsonStream(res.body, (line) =>
@@ -301,23 +249,28 @@ export default function LogForm() {
       );
       if (result.success) {
         const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
-        setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
+        onNotify({
+          type: "success",
+          title: NOTIFY.HRM_LOGGED,
+          detail: `${ticketIds} on ${logDates.map(formatDateDisplay).join(", ")}`,
+        });
         setStagedTickets([]);
       } else {
-        setHrmStatus({ state: "error", message: result.error || "Failed to log to HRM" });
+        onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: result.error || NOTIFY.ERR_HRM });
       }
     } catch {
-      setHrmStatus({ state: "error", message: "Failed to reach HRM" });
+      onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: NOTIFY.ERR_HRM_API });
+    } finally {
+      setIsHrmLogging(false);
     }
-  }, [stagedTickets, logDates, isLogging]);
+  }, [stagedTickets, logDates, isLogging, onNotify]);
 
   const handleLogAll = useCallback(async () => {
     if (stagedTickets.length === 0 || isLogging) return;
-
     const tscTicket = stagedTickets.map((t) => t.ticket).join(", ");
-
-    setLogStatus({ state: "loading" });
-    setHrmStatus({ state: "loading" });
+    const tscSummary = stagedTickets.map((t) => t.summary).join(", ");
+    setIsTscLogging(true);
+    setIsHrmLogging(true);
     setTscLogs([]);
     setHrmLogs([]);
 
@@ -331,24 +284,30 @@ export default function LogForm() {
           });
           if (!res.ok) {
             const data = await res.json().catch(() => ({})) as { error?: string };
-            setLogStatus({ state: "error", message: data.error ?? "Failed to log" });
+            onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: data.error ?? NOTIFY.ERR_LOG });
             return;
           }
           if (!res.body) {
-            setLogStatus({ state: "error", message: "Failed to log" });
+            onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: NOTIFY.ERR_LOG });
             return;
           }
           const result = await readNdJsonStream(res.body, (line) =>
             setTscLogs((prev) => [...prev, line])
           );
           if (result.success) {
-            setLogStatus({ state: "success", message: `Logged "${tscTicket}" at cell ${result.cell ?? "O"}` });
+            onNotify({
+              type: "success",
+              title: NOTIFY.TSC_LOGGED,
+              detail: `${tscSummary} → cell ${result.cell ?? "?"}`,
+            });
             setStagedTickets([]);
           } else {
-            setLogStatus({ state: "error", message: result.error || "Failed to log" });
+            onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: result.error || NOTIFY.ERR_LOG });
           }
         } catch {
-          setLogStatus({ state: "error", message: "Failed to write to Excel" });
+          onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: NOTIFY.ERR_EXCEL });
+        } finally {
+          setIsTscLogging(false);
         }
       })(),
       (async () => {
@@ -360,11 +319,11 @@ export default function LogForm() {
           });
           if (!res.ok) {
             const data = await res.json().catch(() => ({})) as { error?: string };
-            setHrmStatus({ state: "error", message: data.error ?? "Failed to log to HRM" });
+            onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: data.error ?? NOTIFY.ERR_HRM });
             return;
           }
           if (!res.body) {
-            setHrmStatus({ state: "error", message: "Failed to log to HRM" });
+            onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: NOTIFY.ERR_HRM });
             return;
           }
           const result = await readNdJsonStream(res.body, (line) =>
@@ -372,87 +331,82 @@ export default function LogForm() {
           );
           if (result.success) {
             const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
-            setHrmStatus({ state: "success", message: `Logged ${ticketIds} to HRM timesheet` });
+            onNotify({
+              type: "success",
+              title: NOTIFY.HRM_LOGGED,
+              detail: `${ticketIds} on ${logDates.map(formatDateDisplay).join(", ")}`,
+            });
             setStagedTickets([]);
           } else {
-            setHrmStatus({ state: "error", message: result.error || "Failed to log to HRM" });
+            onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: result.error || NOTIFY.ERR_HRM });
           }
         } catch {
-          setHrmStatus({ state: "error", message: "Failed to reach HRM" });
+          onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: NOTIFY.ERR_HRM_API });
+        } finally {
+          setIsHrmLogging(false);
         }
       })(),
     ]);
-  }, [logDates, stagedTickets, isLogging]);
+  }, [logDates, stagedTickets, isLogging, onNotify]);
 
-  const logAllLabel = `Log All — ${stagedTickets.length} ticket${stagedTickets.length !== 1 ? "s" : ""} × ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
+  const logAllLabel = `Log All — ${stagedTickets.length} ticket${stagedTickets.length !== 1 ? "s" : ""} x ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
   const showFormatError = ticket.length > 0 && !isTicketValid;
 
   return (
     <div className="space-y-2.5">
       <div className="grid grid-cols-2 gap-2.5">
         {/* Tickets card */}
-        <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
+        <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-5 py-4 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
-              {stagedTickets.length > 0 ? `Tickets (${stagedTickets.length}/5)` : "Tickets"}
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">
+              {stagedTickets.length > 0 ? `${LABELS.TICKETS} (${stagedTickets.length}/5)` : LABELS.TICKETS}
             </p>
             {stagedTickets.length > 0 && (
               <button
                 type="button"
                 onClick={() => setStagedTickets([])}
-                className="text-xs text-slate-500 hover:text-red-400"
+                className="text-xs text-gray-500 hover:text-red-400"
               >
-                Clear All
+                {LABELS.CLEAR_ALL}
               </button>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <label htmlFor="ticket" className="text-sm font-medium text-slate-400">
-              Ticket:
+          <div className="flex flex-col gap-2">
+            <label htmlFor="ticket" className="text-sm font-medium text-emerald-800">
+              {LABELS.TICKET}
             </label>
             <input
               id="ticket"
               type="text"
-              placeholder="MDP-1234 or MDP-1234, MDP-5678"
+              autoComplete="off"
+              placeholder={LABELS.TICKET_PLACEHOLDER}
               value={ticket}
               onChange={handleTicketChange}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && isTicketValid && jiraStatus.state !== "loading") {
+                if (e.key === "Enter" && isTicketValid && !isJiraLoading) {
                   handleVerify();
                 }
               }}
-              className={`flex-1 rounded-lg border bg-slate-900 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 ${
+              className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 ${
                 showFormatError
                   ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                  : "border-slate-700 focus:border-blue-500 focus:ring-blue-500"
+                  : "border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500"
               }`}
             />
             <button
               type="button"
-              disabled={!isTicketValid || jiraStatus.state === "loading"}
+              disabled={!isTicketValid || isJiraLoading}
               onClick={handleVerify}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white
+              className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white
                          active:scale-95 transition-transform duration-100
-                         hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                         hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Verify
+              {isJiraLoading ? LABELS.VERIFYING : LABELS.VERIFY}
             </button>
           </div>
           {showFormatError && (
-            <p className="text-xs text-red-400">Use MDP-xxxx format</p>
+            <p className="text-xs text-red-400">{LABELS.TICKET_FORMAT_ERROR}</p>
           )}
-          <StatusIndicator
-            label="Jira"
-            status={jiraStatus.state}
-            fading={jiraFading}
-            message={
-              jiraStatus.state === "success" || jiraStatus.state === "error"
-                ? jiraStatus.message
-                : jiraStatus.state === "loading"
-                  ? "Verifying..."
-                  : undefined
-            }
-          />
           {stagedTickets.length > 0 && (
             <ul className="space-y-1.5">
               {stagedTickets.map((item) => {
@@ -460,23 +414,23 @@ export default function LogForm() {
                 return (
                   <li
                     key={item.ticket}
-                    className={`flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm transition-all duration-150 ${
+                    className={`flex items-center justify-between rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm transition-all duration-150 ${
                       exitingTickets.has(item.ticket) ? "opacity-0 -translate-y-1.5" : "animate-slide-in"
                     }`}
                   >
                     <span className="flex flex-col min-w-0">
-                      <span className="font-medium text-slate-200">{item.ticket}</span>
+                      <span className="font-medium text-gray-800">{item.ticket}</span>
                       {description && (
-                        <span className="truncate text-xs text-slate-500">{description}</span>
+                        <span className="truncate text-xs text-gray-500">{description}</span>
                       )}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleRemoveFromStaged(item.ticket)}
-                      className="ml-3 shrink-0 rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-red-400"
+                      className="ml-3 shrink-0 rounded p-1 text-gray-400 hover:bg-emerald-50 hover:text-red-400"
                       aria-label={`Remove ${item.ticket}`}
                     >
-                      ✕
+                      &#x2715;
                     </button>
                   </li>
                 );
@@ -486,11 +440,24 @@ export default function LogForm() {
         </div>
 
         {/* Dates card */}
-        <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Dates</p>
-          <div className="flex items-center gap-3">
-            <label htmlFor="log-date" className="text-sm font-medium text-slate-400">
-              Date:
+        <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-5 py-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">
+              {logDates.length > 0 ? `${LABELS.DATES} (${logDates.length}/${MAX_LOG_DATES})` : LABELS.DATES}
+            </p>
+            {logDates.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setLogDates([])}
+                className="text-xs text-gray-500 hover:text-red-400"
+              >
+                {LABELS.CLEAR_ALL}
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="log-date" className="text-sm font-medium text-emerald-800">
+              {LABELS.DATE}
             </label>
             <DatePickerPopover
               id="log-date"
@@ -501,13 +468,13 @@ export default function LogForm() {
             />
             <button
               type="button"
-              disabled={!stagingDate || logDates.includes(stagingDate)}
+              disabled={!stagingDate || logDates.includes(stagingDate) || logDates.length >= MAX_LOG_DATES}
               onClick={handleAddDate}
-              className="rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm font-medium text-slate-300
+              className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white
                          active:scale-95 transition-transform duration-100
-                         hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                         hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              + Add
+              {LABELS.ADD}
             </button>
           </div>
           {logDates.length > 0 && (
@@ -515,16 +482,27 @@ export default function LogForm() {
               {logDates.map((d) => (
                 <li
                   key={d}
-                  className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
                 >
-                  <span className="text-slate-300">{formatDateDisplay(d)}</span>
+                  <span className="flex flex-col min-w-0">
+                    <span className="font-medium text-gray-800">
+                      {new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(
+                        (() => { const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day); })()
+                      )}
+                    </span>
+                    <span className="truncate text-xs text-gray-500">
+                      {new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(
+                        (() => { const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day); })()
+                      )}
+                    </span>
+                  </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveDate(d)}
-                    className="ml-2 shrink-0 rounded p-1 text-slate-600 hover:bg-slate-700 hover:text-red-400"
+                    className="ml-2 shrink-0 rounded p-1 text-gray-400 hover:bg-emerald-50 hover:text-red-400"
                     aria-label={`Remove date ${d}`}
                   >
-                    ✕
+                    &#x2715;
                   </button>
                 </li>
               ))}
@@ -534,50 +512,56 @@ export default function LogForm() {
       </div>
 
       {/* Status card */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Status</p>
-        <div className="grid grid-cols-2 gap-4">
-          <StatusIndicator
-            label="TSC Log"
-            status={logStatus.state}
-            fading={logFading}
-            logs={tscLogs}
-            message={
-              logStatus.state === "success" || logStatus.state === "error"
-                ? logStatus.message
-                : logStatus.state === "loading"
-                  ? "Writing to Excel... (browser will open briefly)"
-                  : undefined
-            }
-          />
-          <StatusIndicator
-            label="HRM Log"
-            status={hrmStatus.state}
-            fading={hrmFading}
-            logs={hrmLogs}
-            message={
-              hrmStatus.state === "success" || hrmStatus.state === "error"
-                ? hrmStatus.message
-                : hrmStatus.state === "loading"
-                  ? "Logging to HRM... (browser will open briefly)"
-                  : undefined
-            }
-          />
+      <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">{LABELS.STATUS}</p>
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* TSC Log block */}
+          <div className="rounded-lg border border-emerald-200 bg-white px-4 py-3 space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">{LABELS.TSC_LOG}</p>
+            <LogPanel logs={tscLogs} />
+          </div>
+
+          {/* HRM Log block */}
+          <div className="rounded-lg border border-emerald-200 bg-white px-4 py-3 space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">{LABELS.HRM_LOG}</p>
+            <LogPanel logs={hrmLogs} />
+          </div>
         </div>
       </div>
 
       {/* Actions card */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800 px-5 py-4 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Actions</p>
+      <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">{LABELS.ACTIONS}</p>
         {stagedTickets.length > 0 && logDates.length > 0 && (
-          <div className="rounded-lg border border-blue-900/50 border-l-[3px] border-l-blue-500 bg-blue-950/30 px-4 py-3 text-sm">
-            <p className="font-medium text-blue-300">Will log:</p>
-            <p className="mt-1 text-blue-400">
-              {stagedTickets.map((t) => t.ticket).join(", ")}
-            </p>
-            <p className="text-blue-500">
-              on {logDates.map((d) => formatDateDisplay(d)).join(", ")}
-            </p>
+          <div data-testid="will-log-summary" className="rounded-lg border border-emerald-200 border-l-[3px] border-l-emerald-500 bg-emerald-50 px-4 py-3 text-sm space-y-3">
+            {/* Tickets section */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-600 mb-1.5">{LABELS.TICKETS}</p>
+              <ul className="space-y-1">
+                {stagedTickets.map((t, i) => {
+                  const slots = getTimeSlots(stagedTickets.length, i);
+                  const timeStr = slots.map((s) => `${s.start}\u2013${s.end}`).join(" / ");
+                  return (
+                    <li key={t.ticket} className="flex items-center gap-2 text-emerald-700">
+                      <span className="font-medium">{t.ticket}</span>
+                      <span className="text-emerald-500 text-xs">{timeStr}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            <div className="border-t border-emerald-200" />
+
+            {/* Dates section */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-600 mb-1.5">{LABELS.DATES}</p>
+              <ul className="space-y-1">
+                {logDates.map((d) => (
+                  <li key={d} className="text-emerald-700">{formatDateDisplay(d)}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
         <div className="flex flex-col gap-2.5">
@@ -586,19 +570,19 @@ export default function LogForm() {
               type="button"
               disabled={stagedTickets.length === 0 || logDates.length === 0 || isLogging}
               onClick={handleLogTsc}
-              className="rounded-lg border border-blue-600 bg-transparent px-4 py-2.5 text-sm font-medium text-blue-400
+              className="rounded-lg border border-emerald-600 bg-transparent px-4 py-2.5 text-sm font-medium text-emerald-600
                          active:scale-95 transition-transform duration-100
-                         hover:bg-blue-950 disabled:cursor-not-allowed disabled:opacity-50"
+                         hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Log TSC
+              {LABELS.LOG_TSC}
             </button>
             <button
               type="button"
               disabled={stagedTickets.length === 0 || isLogging}
               onClick={handleLogHrm}
-              className="rounded-lg border border-teal-600 bg-transparent px-4 py-2.5 text-sm font-medium text-teal-400
+              className="rounded-lg border border-teal-700 bg-transparent px-4 py-2.5 text-sm font-medium text-teal-700
                          active:scale-95 transition-transform duration-100
-                         hover:bg-teal-950 disabled:cursor-not-allowed disabled:opacity-50"
+                         hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Log HRM ({stagedTickets.length})
             </button>
@@ -607,9 +591,9 @@ export default function LogForm() {
             type="button"
             disabled={stagedTickets.length === 0 || isLogging}
             onClick={handleLogAll}
-            className="w-full rounded-lg bg-violet-700 px-4 py-3 text-sm font-medium text-white
+            className="w-full rounded-lg bg-emerald-800 px-4 py-3 text-sm font-medium text-white
                        active:scale-95 transition-transform duration-100
-                       hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
+                       hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {logAllLabel}
           </button>

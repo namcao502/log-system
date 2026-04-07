@@ -1,4 +1,4 @@
-import LogForm from "@/components/LogForm";
+import AppShell from "@/components/AppShell";
 
 function getFormattedDate(): string {
   const now = new Date();
@@ -14,15 +14,10 @@ function getFormattedDate(): string {
 
 export default function Home() {
   const today = getFormattedDate();
-
   return (
-    <main className="flex min-h-screen items-start justify-center bg-slate-950 px-4 pt-16">
-      <div className="w-full max-w-lg">
-        <h1 className="text-lg font-semibold text-slate-100">Welcome, Nam Nguyen</h1>
-        <p className="mt-1 text-sm text-slate-500">Today: {today}</p>
-        <div className="mt-6">
-          <LogForm />
-        </div>
+    <main className="flex min-h-screen items-start justify-center bg-gradient-to-br from-emerald-100 to-teal-100 px-4 pt-16">
+      <div className="w-full max-w-3xl">
+        <AppShell today={today} />
       </div>
     </main>
   );

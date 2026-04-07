@@ -36,3 +36,13 @@ export type HrmStreamLine =
   | { type: "log"; data: string }
   | { type: "result"; success: true }
   | { type: "result"; success: false; error: string };
+
+export interface Notification {
+  id: string;
+  type: "success" | "error" | "info";
+  title: string;
+  detail: string;
+  timestamp: number; // Date.now()
+}
+
+export type Toast = Omit<Notification, "timestamp">;

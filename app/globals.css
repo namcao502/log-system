@@ -3,5 +3,30 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-950 text-slate-100 min-h-screen;
+  @apply bg-gradient-to-br from-emerald-100 to-teal-100 text-gray-900 min-h-screen;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px white inset;
+  box-shadow: 0 0 0px 1000px white inset;
+}
+
+.scrollbar-dark {
+  scrollbar-width: thin;
+  scrollbar-color: #6ee7b7 transparent; /* emerald-300 thumb, transparent track */
+}
+
+.scrollbar-dark::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background-color: #6ee7b7; /* emerald-300 */
+  border-radius: 9999px;
 }

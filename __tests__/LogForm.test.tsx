@@ -40,6 +40,7 @@ import LogForm from "@/components/LogForm";
 const mockFetch = jest.fn();
 
 let resolvePendingFetch: (() => void) | null = null;
+let mockOnNotify: jest.Mock;
 
 function pendingFetchResponse() {
   return new Promise<Response>((resolve) => {
@@ -55,6 +56,7 @@ function pendingFetchResponse() {
 beforeEach(() => {
   jest.resetAllMocks();
   global.fetch = mockFetch;
+  mockOnNotify = jest.fn();
 });
 
 afterEach(() => {
@@ -144,18 +146,18 @@ function getTodayISO(): string {
 
 describe("LogForm -- input rendering", () => {
   it("renders ticket input with placeholder", () => {
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     expect(screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678")).toBeInTheDocument();
   });
 
   it("renders the Ticket label", () => {
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     expect(screen.getByText("Ticket:")).toBeInTheDocument();
   });
 
   it("converts typed text to uppercase", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await typeTicket(user, "mdp-1234");
     expect(screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678")).toHaveValue("MDP-1234");
   });
@@ -167,34 +169,34 @@ describe("LogForm -- input rendering", () => {
 
 describe("LogForm -- Verify button disabled states", () => {
   it("is disabled when input is empty", () => {
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     expect(screen.getByRole("button", { name: /verify/i })).toBeDisabled();
   });
 
   it("is disabled when input does not match MDP-XXXX pattern", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await typeTicket(user, "INVALID");
     expect(screen.getByRole("button", { name: /verify/i })).toBeDisabled();
   });
 
   it("is disabled for partial match like MDP-", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await typeTicket(user, "MDP-");
     expect(screen.getByRole("button", { name: /verify/i })).toBeDisabled();
   });
 
   it("is disabled for MDP without hyphen", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await typeTicket(user, "MDP1234");
     expect(screen.getByRole("button", { name: /verify/i })).toBeDisabled();
   });
 
   it("is enabled when input matches MDP-XXXX pattern", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await typeTicket(user, "MDP-5678");
     expect(screen.getByRole("button", { name: /verify/i })).toBeEnabled();
   });
@@ -206,13 +208,13 @@ describe("LogForm -- Verify button disabled states", () => {
 
 describe("LogForm -- Log TSC button disabled states", () => {
   it("is disabled before verification", () => {
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     expect(screen.getByRole("button", { name: /log tsc/i })).toBeDisabled();
   });
 
   it("is enabled after successful verification", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await verifySuccessFlow(user);
     expect(screen.getByRole("button", { name: /log tsc/i })).toBeEnabled();
   });
@@ -224,13 +226,13 @@ describe("LogForm -- Log TSC button disabled states", () => {
 
 describe("LogForm -- Log HRM button disabled states", () => {
   it("is disabled when HRM ticket list is empty", () => {
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     expect(screen.getByRole("button", { name: /log hrm/i })).toBeDisabled();
   });
 
   it("is enabled after adding a ticket to HRM list", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     expect(screen.getByRole("button", { name: /log hrm/i })).toBeEnabled();
   });
@@ -243,7 +245,7 @@ describe("LogForm -- Log HRM button disabled states", () => {
 describe("LogForm -- Verify happy path", () => {
   it("shows ticket summary on successful verification", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     mockFetch.mockReturnValueOnce(
       jsonResponse({ valid: true, summary: "Implement dashboard" })
@@ -259,7 +261,7 @@ describe("LogForm -- Verify happy path", () => {
 
   it("calls fetch with the correct URL including ticket param", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     mockFetch.mockReturnValueOnce(
       jsonResponse({ valid: true, summary: "Test" })
@@ -281,9 +283,9 @@ describe("LogForm -- Verify happy path", () => {
 // ---------------------------------------------------------------------------
 
 describe("LogForm -- Verify error paths", () => {
-  it("shows error when ticket is not found on Jira", async () => {
+  it("calls onNotify with error when ticket is not found on Jira", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     mockFetch.mockReturnValueOnce(
       jsonResponse({ valid: false, error: "Ticket not found" })
@@ -293,27 +295,17 @@ describe("LogForm -- Verify error paths", () => {
     await user.click(screen.getByRole("button", { name: /verify/i }));
 
     await waitFor(() =>
-      expect(screen.getByText(/Invalid: MDP-0001/)).toBeInTheDocument()
+      expect(mockOnNotify).toHaveBeenCalledWith({
+        type: "error",
+        title: "Jira failed",
+        detail: "Invalid: MDP-0001",
+      })
     );
   });
 
-  it("shows fallback error when valid is false and no error message", async () => {
+  it("calls onNotify with error when fetch throws", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
-
-    mockFetch.mockReturnValueOnce(jsonResponse({ valid: false }));
-
-    await typeTicket(user, "MDP-0002");
-    await user.click(screen.getByRole("button", { name: /verify/i }));
-
-    await waitFor(() =>
-      expect(screen.getByText(/Invalid: MDP-0002/)).toBeInTheDocument()
-    );
-  });
-
-  it("shows network error when fetch throws", async () => {
-    const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
@@ -321,7 +313,11 @@ describe("LogForm -- Verify error paths", () => {
     await user.click(screen.getByRole("button", { name: /verify/i }));
 
     await waitFor(() =>
-      expect(screen.getByText("Failed to reach Jira API")).toBeInTheDocument()
+      expect(mockOnNotify).toHaveBeenCalledWith({
+        type: "error",
+        title: "Jira failed",
+        detail: "Failed to reach Jira API",
+      })
     );
   });
 });
@@ -331,9 +327,9 @@ describe("LogForm -- Verify error paths", () => {
 // ---------------------------------------------------------------------------
 
 describe("LogForm -- Log TSC happy path", () => {
-  it("shows cell info on successful log", async () => {
+  it("calls onNotify with success on successful TSC log", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     await verifySuccessFlow(user);
 
@@ -344,13 +340,17 @@ describe("LogForm -- Log TSC happy path", () => {
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
 
     await waitFor(() =>
-      expect(screen.getByText(/Logged "MDP-1234" at cell O66/)).toBeInTheDocument()
+      expect(mockOnNotify).toHaveBeenCalledWith({
+        type: "success",
+        title: "TSC logged",
+        detail: "MDP-1234 — Fix login bug → cell O66",
+      })
     );
   });
 
   it("sends POST to /api/sharepoint/log with ticket and date in body", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     await verifySuccessFlow(user);
 
@@ -375,52 +375,52 @@ describe("LogForm -- Log TSC happy path", () => {
 // ---------------------------------------------------------------------------
 
 describe("LogForm -- Log TSC error paths", () => {
-  it("shows error when log API returns failure", async () => {
+  it("calls onNotify with error when log API returns failure", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
-
+    render(<LogForm onNotify={mockOnNotify} />);
     await verifySuccessFlow(user);
-
     mockFetch.mockReturnValueOnce(
       streamResponse([{ type: "result", success: false, error: "Browser automation failed" }])
     );
-
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
-
     await waitFor(() =>
-      expect(screen.getByText("Browser automation failed")).toBeInTheDocument()
+      expect(mockOnNotify).toHaveBeenCalledWith({
+        type: "error",
+        title: "TSC failed",
+        detail: "Browser automation failed",
+      })
     );
   });
 
-  it("shows fallback error when success is false and no error message", async () => {
+  it("calls onNotify with fallback error when no error message", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
-
+    render(<LogForm onNotify={mockOnNotify} />);
     await verifySuccessFlow(user);
-
     mockFetch.mockReturnValueOnce(
       streamResponse([{ type: "result", success: false, error: "" }])
     );
-
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
-
     await waitFor(() =>
-      expect(screen.getByText("Failed to log")).toBeInTheDocument()
+      expect(mockOnNotify).toHaveBeenCalledWith({
+        type: "error",
+        title: "TSC failed",
+        detail: "Failed to log",
+      })
     );
   });
 
-  it("shows network error when log fetch throws", async () => {
+  it("calls onNotify with network error when log fetch throws", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
-
+    render(<LogForm onNotify={mockOnNotify} />);
     await verifySuccessFlow(user);
-
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
-
     await user.click(screen.getByRole("button", { name: /log tsc/i }));
-
     await waitFor(() =>
-      expect(screen.getByText("Failed to write to Excel")).toBeInTheDocument()
+      expect(mockOnNotify).toHaveBeenCalledWith({
+        type: "error",
+        title: "TSC failed",
+        detail: "Failed to write to Excel",
+      })
     );
   });
 });
@@ -430,20 +430,22 @@ describe("LogForm -- Log TSC error paths", () => {
 // ---------------------------------------------------------------------------
 
 describe("LogForm -- Log HRM happy path", () => {
-  it("shows success message on successful HRM log", async () => {
+  it("calls onNotify with success on successful HRM log", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(streamResponse([{ type: "result", success: true }]));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
-      expect(screen.getByText(/Logged MDP-1234 to HRM timesheet/)).toBeInTheDocument()
+      expect(mockOnNotify).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "success", title: "HRM logged" })
+      )
     );
   });
 
   it("sends POST to /api/hrm/log with tickets array and date in body", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(streamResponse([{ type: "result", success: true }]));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
@@ -458,7 +460,7 @@ describe("LogForm -- Log HRM happy path", () => {
 
   it("sends multiple tickets when multiple are added to HRM list", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-100", "Feature A");
     await addTicketToHrm(user, "MDP-200", "Feature B");
     mockFetch.mockReturnValueOnce(streamResponse([{ type: "result", success: true }]));
@@ -477,40 +479,52 @@ describe("LogForm -- Log HRM happy path", () => {
 // ---------------------------------------------------------------------------
 
 describe("LogForm -- Log HRM error paths", () => {
-  it("shows error when HRM API returns failure", async () => {
+  it("calls onNotify with error when HRM API returns failure", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(
       streamResponse([{ type: "result", success: false, error: "HRM automation failed" }])
     );
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
-      expect(screen.getByText("HRM automation failed")).toBeInTheDocument()
+      expect(mockOnNotify).toHaveBeenCalledWith({
+        type: "error",
+        title: "HRM failed",
+        detail: "HRM automation failed",
+      })
     );
   });
 
-  it("shows fallback error when success is false and no error message", async () => {
+  it("calls onNotify with fallback error when no error message", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(
       streamResponse([{ type: "result", success: false, error: "" }])
     );
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
-      expect(screen.getByText("Failed to log to HRM")).toBeInTheDocument()
+      expect(mockOnNotify).toHaveBeenCalledWith({
+        type: "error",
+        title: "HRM failed",
+        detail: "Failed to log to HRM",
+      })
     );
   });
 
-  it("shows network error when HRM fetch throws", async () => {
+  it("calls onNotify with network error when HRM fetch throws", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     await waitFor(() =>
-      expect(screen.getByText("Failed to reach HRM")).toBeInTheDocument()
+      expect(mockOnNotify).toHaveBeenCalledWith({
+        type: "error",
+        title: "HRM failed",
+        detail: "Failed to reach HRM",
+      })
     );
   });
 });
@@ -522,14 +536,14 @@ describe("LogForm -- Log HRM error paths", () => {
 describe("LogForm -- HRM ticket list", () => {
   it("adds a verified ticket to the HRM list", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0);
   });
 
   it("removes a ticket from the HRM list", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     expect(screen.getAllByText("MDP-1234").length).toBeGreaterThan(0);
 
@@ -542,7 +556,7 @@ describe("LogForm -- HRM ticket list", () => {
 
   it("prevents adding duplicate tickets", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
     // Verify the same ticket again -- auto-stage should skip the duplicate
@@ -561,32 +575,12 @@ describe("LogForm -- HRM ticket list", () => {
 
   it("shows ticket count in Log HRM button", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     expect(screen.getByRole("button", { name: /log hrm/i })).toHaveTextContent("Log HRM (0)");
     await addTicketToHrm(user, "MDP-100", "Feature A");
     expect(screen.getByRole("button", { name: /log hrm/i })).toHaveTextContent("Log HRM (1)");
     await addTicketToHrm(user, "MDP-200", "Feature B");
     expect(screen.getByRole("button", { name: /log hrm/i })).toHaveTextContent("Log HRM (2)");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Status reset on input change
-// ---------------------------------------------------------------------------
-
-describe("LogForm -- status reset on input change", () => {
-  it("resets Jira status when ticket input changes", async () => {
-    const user = userEvent.setup();
-    render(<LogForm />);
-
-    await verifySuccessFlow(user);
-    // The full status message (ticket + summary) is shown in the Jira indicator
-    expect(screen.getByText(/MDP-1234 — Fix login bug/)).toBeInTheDocument();
-
-    await typeTicket(user, "MDP-9999");
-
-    // Jira status indicator message clears (ticket stays staged but status resets)
-    expect(screen.queryByText(/MDP-1234 — Fix login bug/)).not.toBeInTheDocument();
   });
 });
 
@@ -597,7 +591,7 @@ describe("LogForm -- status reset on input change", () => {
 describe("LogForm -- loading states", () => {
   it("disables Verify button while verification is in progress", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     mockFetch.mockReturnValueOnce(pendingFetchResponse());
 
@@ -607,21 +601,9 @@ describe("LogForm -- loading states", () => {
     expect(screen.getByRole("button", { name: /verify/i })).toBeDisabled();
   });
 
-  it("shows Verifying... message during loading", async () => {
-    const user = userEvent.setup();
-    render(<LogForm />);
-
-    mockFetch.mockReturnValueOnce(pendingFetchResponse());
-
-    await typeTicket(user, "MDP-1234");
-    await user.click(screen.getByRole("button", { name: /verify/i }));
-
-    expect(screen.getByText("Verifying...")).toBeInTheDocument();
-  });
-
   it("disables Log TSC button while logging is in progress", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     await verifySuccessFlow(user);
 
@@ -632,36 +614,15 @@ describe("LogForm -- loading states", () => {
     expect(screen.getByRole("button", { name: /log tsc/i })).toBeDisabled();
   });
 
-  it("shows Writing... message during log loading", async () => {
-    const user = userEvent.setup();
-    render(<LogForm />);
-
-    await verifySuccessFlow(user);
-
-    mockFetch.mockReturnValueOnce(pendingFetchResponse());
-
-    await user.click(screen.getByRole("button", { name: /log tsc/i }));
-
-    expect(screen.getByText("Writing to Excel... (browser will open briefly)")).toBeInTheDocument();
-  });
-
   it("disables Log HRM button while HRM logging is in progress", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     mockFetch.mockReturnValueOnce(pendingFetchResponse());
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
     expect(screen.getByRole("button", { name: /log hrm/i })).toBeDisabled();
   });
 
-  it("shows Logging to HRM... message during HRM loading", async () => {
-    const user = userEvent.setup();
-    render(<LogForm />);
-    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
-    mockFetch.mockReturnValueOnce(pendingFetchResponse());
-    await user.click(screen.getByRole("button", { name: /log hrm/i }));
-    expect(screen.getByText("Logging to HRM... (browser will open briefly)")).toBeInTheDocument();
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -670,14 +631,14 @@ describe("LogForm -- loading states", () => {
 
 describe("LogForm -- date picker", () => {
   it("renders date input with today's value on initial render", () => {
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     const dateInput = screen.getByLabelText("Date:");
     expect(dateInput).toHaveValue(getTodayISO());
   });
 
   it("preserves selected date when ticket input changes", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     const dateInput = screen.getByLabelText("Date:");
     fireEvent.change(dateInput, { target: { value: "2026-01-15" } });
@@ -691,10 +652,11 @@ describe("LogForm -- date picker", () => {
 
   it("Log TSC sends the selected date", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await verifySuccessFlow(user);
 
     fireEvent.change(screen.getByLabelText("Date:"), { target: { value: "2026-01-15" } });
+    await user.click(screen.getByRole("button", { name: /^add$/i }));
 
     mockFetch.mockReturnValueOnce(
       streamResponse([{ type: "result", success: true, cell: "O15" }])
@@ -705,16 +667,17 @@ describe("LogForm -- date picker", () => {
       const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/sharepoint/log");
       expect(call).toBeTruthy();
       const body = JSON.parse((call![1] as RequestInit).body as string);
-      expect(body.dates[0]).toBe("2026-01-15");
+      expect(body.dates).toContain("2026-01-15");
     });
   });
 
   it("Log HRM sends the selected date", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
     fireEvent.change(screen.getByLabelText("Date:"), { target: { value: "2026-01-15" } });
+    await user.click(screen.getByRole("button", { name: /^add$/i }));
 
     mockFetch.mockReturnValueOnce(streamResponse([{ type: "result", success: true }]));
     await user.click(screen.getByRole("button", { name: /log hrm/i }));
@@ -723,7 +686,7 @@ describe("LogForm -- date picker", () => {
       const call = mockFetch.mock.calls.find(([url]: [string]) => url === "/api/hrm/log");
       expect(call).toBeTruthy();
       const body = JSON.parse((call![1] as RequestInit).body as string);
-      expect(body.dates[0]).toBe("2026-01-15");
+      expect(body.dates).toContain("2026-01-15");
     });
   });
 });
@@ -734,13 +697,13 @@ describe("LogForm -- date picker", () => {
 
 describe("LogForm -- Log All button disabled states", () => {
   it("is disabled before Jira verification", () => {
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     expect(screen.getByRole("button", { name: /log all/i })).toBeDisabled();
   });
 
   it("is disabled when all staged tickets are removed after verification", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await verifySuccessFlow(user);
     // Remove the auto-staged ticket
     await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
@@ -752,7 +715,7 @@ describe("LogForm -- Log All button disabled states", () => {
 
   it("is disabled when staged list is empty", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     // Remove the staged ticket — Log All should become disabled
     await user.click(screen.getByRole("button", { name: /remove MDP-1234/i }));
@@ -764,7 +727,7 @@ describe("LogForm -- Log All button disabled states", () => {
 
   it("is enabled when Jira is verified AND HRM list has tickets", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
     // addTicketToHrm leaves jiraStatus as success for current ticket
     expect(screen.getByRole("button", { name: /log all/i })).toBeEnabled();
@@ -772,7 +735,7 @@ describe("LogForm -- Log All button disabled states", () => {
 
   it("is disabled while TSC log is in-flight", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
     mockFetch.mockReturnValueOnce(pendingFetchResponse());
@@ -784,7 +747,7 @@ describe("LogForm -- Log All button disabled states", () => {
 
   it("is disabled while HRM log is in-flight", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
     mockFetch.mockReturnValueOnce(pendingFetchResponse());
@@ -800,22 +763,9 @@ describe("LogForm -- Log All button disabled states", () => {
 // ---------------------------------------------------------------------------
 
 describe("LogForm -- Log All parallel execution", () => {
-  it("sets both logStatus and hrmStatus to loading before any fetch resolves", async () => {
-    const user = userEvent.setup();
-    render(<LogForm />);
-    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
-
-    mockFetch.mockReturnValueOnce(pendingFetchResponse());
-    mockFetch.mockReturnValueOnce(pendingFetchResponse());
-    await user.click(screen.getByRole("button", { name: /log all/i }));
-
-    expect(screen.getByText("Writing to Excel... (browser will open briefly)")).toBeInTheDocument();
-    expect(screen.getByText("Logging to HRM... (browser will open briefly)")).toBeInTheDocument();
-  });
-
   it("fires both /api/sharepoint/log and /api/hrm/log when clicked", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
     mockFetch.mockReturnValueOnce(
@@ -833,9 +783,9 @@ describe("LogForm -- Log All parallel execution", () => {
     });
   });
 
-  it("shows success on both status indicators when both operations succeed", async () => {
+  it("calls onNotify for both TSC and HRM when both succeed", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
     mockFetch.mockReturnValueOnce(
@@ -847,14 +797,18 @@ describe("LogForm -- Log All parallel execution", () => {
     await user.click(screen.getByRole("button", { name: /log all/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Logged "MDP-1234" at cell O66/)).toBeInTheDocument();
-      expect(screen.getByText(/Logged MDP-1234 to HRM timesheet/)).toBeInTheDocument();
+      expect(mockOnNotify).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "success", title: "TSC logged" })
+      );
+      expect(mockOnNotify).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "success", title: "HRM logged" })
+      );
     });
   });
 
-  it("shows TSC success independently when HRM fails", async () => {
+  it("calls onNotify TSC success and HRM error independently", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
     mockFetch.mockReturnValueOnce(
@@ -866,14 +820,18 @@ describe("LogForm -- Log All parallel execution", () => {
     await user.click(screen.getByRole("button", { name: /log all/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Logged "MDP-1234" at cell O66/)).toBeInTheDocument();
-      expect(screen.getByText("HRM error")).toBeInTheDocument();
+      expect(mockOnNotify).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "success", title: "TSC logged" })
+      );
+      expect(mockOnNotify).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "error", title: "HRM failed", detail: "HRM error" })
+      );
     });
   });
 
-  it("shows HRM success independently when TSC fails", async () => {
+  it("calls onNotify HRM success and TSC error independently", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
     await addTicketToHrm(user, "MDP-1234", "Fix login bug");
 
     mockFetch.mockReturnValueOnce(
@@ -885,8 +843,12 @@ describe("LogForm -- Log All parallel execution", () => {
     await user.click(screen.getByRole("button", { name: /log all/i }));
 
     await waitFor(() => {
-      expect(screen.getByText("TSC error")).toBeInTheDocument();
-      expect(screen.getByText(/Logged MDP-1234 to HRM timesheet/)).toBeInTheDocument();
+      expect(mockOnNotify).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "error", title: "TSC failed", detail: "TSC error" })
+      );
+      expect(mockOnNotify).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "success", title: "HRM logged" })
+      );
     });
   });
 
@@ -896,7 +858,7 @@ describe("LogForm -- Log All parallel execution", () => {
       json: async () => ({ valid: true, summary: "Fix login bug" }),
     }) as jest.Mock;
 
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     fireEvent.change(screen.getByPlaceholderText(/MDP-1234/), {
       target: { value: "MDP-1234" },
@@ -916,7 +878,7 @@ describe("LogForm -- Log All parallel execution", () => {
       json: async () => ({ valid: true, summary: "Fix login bug" }),
     }) as jest.Mock;
 
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     fireEvent.change(screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678"), {
       target: { value: "MDP-1234" },
@@ -924,25 +886,15 @@ describe("LogForm -- Log All parallel execution", () => {
     fireEvent.click(screen.getByRole("button", { name: /verify/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/will log/i)).toBeInTheDocument();
+      expect(screen.getByTestId("will-log-summary")).toBeInTheDocument();
     });
 
     expect(screen.getAllByText(/MDP-1234/).length).toBeGreaterThan(0);
   });
 
   it("hides summary banner when staged tickets list is empty", () => {
-    render(<LogForm />);
-    expect(screen.queryByText(/will log/i)).not.toBeInTheDocument();
-  });
-
-  it("shows Jira status below the verify button, not in the Status section", () => {
-    render(<LogForm />);
-
-    // "Jira:" label is always rendered by StatusIndicator (even in idle state)
-    // It should appear before the "Dates" heading (i.e. inside the Tickets section)
-    const jiraLabel = screen.getByText("Jira:");
-    const datesHeading = screen.getByText("Dates");
-    expect(jiraLabel.compareDocumentPosition(datesHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    render(<LogForm onNotify={mockOnNotify} />);
+    expect(screen.queryByTestId("will-log-summary")).not.toBeInTheDocument();
   });
 
   it("shows summary banner below the Status section", async () => {
@@ -951,7 +903,7 @@ describe("LogForm -- Log All parallel execution", () => {
       json: async () => ({ valid: true, summary: "Fix login bug" }),
     }) as jest.Mock;
 
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     fireEvent.change(screen.getByPlaceholderText("MDP-1234 or MDP-1234, MDP-5678"), {
       target: { value: "MDP-1234" },
@@ -960,35 +912,12 @@ describe("LogForm -- Log All parallel execution", () => {
 
     await waitFor(() => {
       const statusHeading = screen.getByText("Status");
-      const banner = screen.getByText(/will log/i);
+      const banner = screen.getByTestId("will-log-summary");
       // Banner appears after Status heading in DOM
       expect(statusHeading.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
 
-  it("resets both statuses to idle when ticket input changes after Log All", async () => {
-    const user = userEvent.setup();
-    render(<LogForm />);
-    await addTicketToHrm(user, "MDP-1234", "Fix login bug");
-
-    mockFetch.mockReturnValueOnce(
-      streamResponse([{ type: "result", success: true, cell: "O66" }])
-    );
-    mockFetch.mockReturnValueOnce(
-      streamResponse([{ type: "result", success: true }])
-    );
-    await user.click(screen.getByRole("button", { name: /log all/i }));
-
-    await waitFor(() =>
-      expect(screen.getByText(/Logged "MDP-1234" at cell O66/)).toBeInTheDocument()
-    );
-
-    // Type a new ticket — both statuses should reset
-    await typeTicket(user, "MDP-9999");
-
-    expect(screen.queryByText(/Logged "MDP-1234"/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Logged MDP-1234 to HRM/)).not.toBeInTheDocument();
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -998,7 +927,7 @@ describe("LogForm -- Log All parallel execution", () => {
 describe("LogForm -- log banner", () => {
   it("shows log lines on TSC Log row after successful log", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     // Verify a ticket
     mockFetch.mockReturnValueOnce(jsonResponse({ valid: true, summary: "Fix login bug" }));
@@ -1023,7 +952,7 @@ describe("LogForm -- log banner", () => {
 
   it("shows log lines on HRM Log row after successful HRM log", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     // Verify a ticket
     mockFetch.mockReturnValueOnce(jsonResponse({ valid: true, summary: "Fix login bug" }));
@@ -1048,7 +977,7 @@ describe("LogForm -- log banner", () => {
 
   it("resets logs when a new TSC log operation starts", async () => {
     const user = userEvent.setup();
-    render(<LogForm />);
+    render(<LogForm onNotify={mockOnNotify} />);
 
     // First verify + log (returns 1 log line)
     mockFetch.mockReturnValueOnce(jsonResponse({ valid: true, summary: "Fix login bug" }));
