@@ -1,5 +1,26 @@
 # Changelog
 
+## [RENAME-BROWSER-TSC] - 2026-04-13
+### Changed
+- Renamed `lib/browser-log.ts` to `lib/browser-tsc.ts` for consistency with `browser-hrm.ts`
+- Log prefix changed from `[browser-log]` to `[browser-tsc]` in all stream output
+
+## [TEAL-RETHEME-NOTIFICATIONS] - 2026-04-03
+### Added
+- Notification bell (`NotificationBell.tsx`) with unread badge and dropdown of past log events
+- Toast system (`Toast.tsx`, `ToastContainer.tsx`) for transient success/error feedback (4 s auto-dismiss)
+- `useNotifications` hook: persistent notification list (addNotification, markRead, clearAll)
+- `useToasts` hook: transient toast list (addToast, dismissToast)
+- `AppShell.tsx` client shell that wires notifications + toasts and renders header + `LogForm`
+- `LogPanel.tsx` scrollable dark-terminal block for streaming log output
+### Changed
+- Rethemed entire UI from dark/slate to teal/emerald gradient palette
+- `page.tsx` now renders `AppShell` instead of `LogForm` directly
+
+## [LOGFORM-LAYOUT-RESTRUCTURE] - 2026-04-03
+### Changed
+- Restructured `LogForm` layout: tickets/dates in a top row, two-column status section, reorganized actions
+
 ## [UI-REDESIGN] - 2026-04-03
 ### Changed
 - Redesigned UI to dark mode with four stacked section cards: Tickets, Dates, Status, Actions
@@ -48,7 +69,7 @@
 ### Added
 - Single-page UI with ticket input, Jira verification, and SharePoint logging (LogForm, StatusIndicator)
 - Jira REST API integration for MDP-xxxx ticket verification (`lib/jira.ts`)
-- Playwright automation for writing to Excel Online (`lib/browser-log.ts`)
+- Playwright automation for writing to Excel Online (`lib/browser-tsc.ts`)
 - Shared TypeScript interfaces for API request/response types (`lib/types.ts`)
 - API routes: `GET /api/jira/verify`, `POST /api/sharepoint/log`
 - Client-side MDP-xxxx format validation

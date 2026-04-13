@@ -36,7 +36,12 @@ JIRA_API_TOKEN=your-atlassian-api-token
 
 ### 3. Authenticate browser sessions (first run only)
 
-The app uses Playwright with a persistent browser profile at `~/.tsc-daily-log-browser/`. On first run, it will open a browser window for you to log in to Microsoft (SharePoint) and HRM manually. Subsequent runs reuse saved cookies.
+The app uses two separate Playwright persistent profiles. On first run each will open a browser window for manual login; subsequent runs reuse saved cookies.
+
+| Profile dir | Used for |
+|-------------|----------|
+| `~/.tsc-daily-log-browser/` | SharePoint Excel (Microsoft login) |
+| `~/.tsc-daily-log-hrm-browser/` | HRM timesheet (hrm.nois.vn login) |
 
 ### 4. Start the dev server
 
@@ -59,23 +64,38 @@ npm test         # Run all tests
 
 ```
 app/
-  page.tsx                    # Server component - renders LogForm
+  page.tsx                    # Server component - renders AppShell with formatted date
+  layout.tsx                  # Root layout with Inter font
+  globals.css                 # Tailwind directives
   api/
     jira/verify/route.ts      # GET  /api/jira/verify?ticket=MDP-xxxx
     sharepoint/log/route.ts   # POST /api/sharepoint/log
     hrm/log/route.ts          # POST /api/hrm/log
 lib/
-  types.ts                    # Shared request/response types
-  jira.ts                     # Jira REST API client
-  browser-log.ts              # Playwright: writes to Excel Online
+  types.ts                    # Shared interfaces (discriminated unions for stream lines, notifications, toasts)
+  constants.ts                # All UI strings: LABELS (display) and NOTIFY (notifications)
+  jira.ts                     # Jira REST API client (Basic auth)
+  browser-tsc.ts              # Playwright: writes to SharePoint Excel Online
   browser-hrm.ts              # Playwright: writes to HRM timesheet
+  time-slots.ts               # Divides 9:00-18:00 workday evenly across N tickets
+  useNotifications.ts         # Hook: persistent notification list (addNotification, markRead, clearAll)
+  useToasts.ts                # Hook: transient toast list (addToast, dismissToast)
 components/
-  LogForm.tsx                 # Main client component
-  StatusIndicator.tsx         # Async state indicator (idle/loading/success/error)
-  DatePickerPopover.tsx       # Calendar popover (react-day-picker)
+  AppShell.tsx                # Client shell - wires notifications + toasts, renders header + LogForm
+  LogForm.tsx                 # Main client component - all state and log orchestration
+  LogPanel.tsx                # Scrollable dark-terminal pre block for streaming log lines
+  DatePickerPopover.tsx       # Calendar popover (react-day-picker) with hidden <input type="date">
+  NotificationBell.tsx        # Bell icon with unread badge and dropdown
+  Toast.tsx                   # Single auto-dismissing toast (4 s)
+  ToastContainer.tsx          # Fixed top-right stack of active toasts
 __tests__/
   LogForm.test.tsx
-  StatusIndicator.test.tsx
+  LogPanel.test.tsx
+  NotificationBell.test.tsx
+  Toast.test.tsx
+  useNotifications.test.ts
+  useToasts.test.ts
+  browser-hrm.test.ts
   jira.test.ts
 ```
 
@@ -84,7 +104,7 @@ __tests__/
 - **File:** TSC Development WIP.xlsx (Dave Markert's OneDrive)
 - **Sheet:** Daily Reports - 2026
 - **Column B:** Dates (M/D/YYYY)
-- **Column O:** Nam Nguyen's log column
+- **Column M:** Log target column (`TARGET_COLUMN` in `browser-tsc.ts`)
 - **Row formula:** `row = 2 + dayOfYear`
 - Multiple tickets are appended with `, ` separator
 

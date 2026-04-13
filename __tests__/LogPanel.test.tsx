@@ -10,7 +10,7 @@ describe("LogPanel", () => {
 
   it("renders a pre element when logs are present", () => {
     const { container } = render(
-      <LogPanel logs={["[browser-log] [0.1s] Browser launched"]} />
+      <LogPanel logs={["[browser-tsc] [0.1s] Browser launched"]} />
     );
     expect(container.querySelector("pre")).toBeInTheDocument();
   });
@@ -19,8 +19,8 @@ describe("LogPanel", () => {
     render(
       <LogPanel
         logs={[
-          "[browser-log] [0.1s] Browser launched",
-          "[browser-log] [1.2s] Done",
+          "[browser-tsc] [0.1s] Browser launched",
+          "[browser-tsc] [1.2s] Done",
         ]}
       />
     );
@@ -30,16 +30,16 @@ describe("LogPanel", () => {
 
   it("colorizes prefix in emerald", () => {
     const { container } = render(
-      <LogPanel logs={["[browser-log] [0.1s] some text"]} />
+      <LogPanel logs={["[browser-tsc] [0.1s] some text"]} />
     );
     const prefix = container.querySelector("span.text-emerald-400");
     expect(prefix).toBeInTheDocument();
-    expect(prefix?.textContent).toBe("[browser-log]");
+    expect(prefix?.textContent).toBe("[browser-tsc]");
   });
 
   it("applies fixed height and overflow scroll classes", () => {
     const { container } = render(
-      <LogPanel logs={["[browser-log] test"]} />
+      <LogPanel logs={["[browser-tsc] test"]} />
     );
     const pre = container.querySelector("pre");
     expect(pre?.className).toContain("h-[211px]");

@@ -3,6 +3,8 @@ import { logTicketsToHrm } from "@/lib/browser-hrm";
 import type { HrmLogRequestBody, HrmStreamLine } from "@/lib/types";
 
 const TICKET_PATTERN = /^MDP-\d+$/;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_DATES = 5;
 
 export async function POST(request: NextRequest): Promise<Response> {
   let body: HrmLogRequestBody;
@@ -31,6 +33,23 @@ export async function POST(request: NextRequest): Promise<Response> {
         { success: false, error: `Invalid ticket format: ${ticket}. Expected MDP-XXXX.` },
         { status: 400 }
       );
+    }
+  }
+
+  if (dates !== undefined) {
+    if (!Array.isArray(dates) || dates.length > MAX_DATES) {
+      return NextResponse.json(
+        { success: false, error: `Expected at most ${MAX_DATES} dates.` },
+        { status: 400 }
+      );
+    }
+    for (const d of dates) {
+      if (!DATE_PATTERN.test(d)) {
+        return NextResponse.json(
+          { success: false, error: `Invalid date format: ${d}. Expected YYYY-MM-DD.` },
+          { status: 400 }
+        );
+      }
     }
   }
 

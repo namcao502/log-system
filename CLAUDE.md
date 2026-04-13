@@ -45,7 +45,7 @@ lib/
                         #   LogStreamLine, HrmStreamLine, Notification, Toast (discriminated unions)
   constants.ts          # All UI plain-text strings: LABELS (display text) and NOTIFY (notification messages)
   jira.ts               # Jira REST API client (Basic auth, API token from env)
-  browser-log.ts        # Playwright: opens Excel Online, navigates to cell, types ticket; accepts onLog callback
+  browser-tsc.ts        # Playwright: opens Excel Online, navigates to cell, types ticket; accepts onLog callback
   browser-hrm.ts        # Playwright: opens HRM timesheet, logs tickets per date; accepts onLog callback
   time-slots.ts         # Divides the 9:00-18:00 workday (lunch break excluded) evenly across N tickets;
                         #   returns TimeSlot[] with HH:MM start/end for each ticket
@@ -91,7 +91,7 @@ __tests__/
 - **File:** TSC Development WIP.xlsx (Dave Markert's OneDrive)
 - **Worksheet:** "Daily Reports - 2026"
 - **Column B:** Dates in M/D/YYYY format
-- **Column M:** Target column for logging (constant `TARGET_COLUMN` in `browser-log.ts`)
+- **Column M:** Target column for logging (constant `TARGET_COLUMN` in `browser-tsc.ts`)
 - **Row formula:** row = 2 (header rows) + dayOfYear
 - **Multiple tickets:** Appended with `, ` separator
 - **Timezone:** Asia/Ho_Chi_Minh
@@ -155,12 +155,12 @@ Teal/emerald gradient palette throughout:
 Both logging API routes stream progress as newline-delimited JSON (`application/x-ndjson`):
 
 ```
-{ "type": "log",    "data": "[browser-log] Browser launched" }
-{ "type": "log",    "data": "[browser-log] Navigated to M366" }
+{ "type": "log",    "data": "[browser-tsc] Browser launched" }
+{ "type": "log",    "data": "[browser-tsc] Navigated to M366" }
 { "type": "result", "success": true, "cell": "M366" }
 ```
 
-- `browser-log.ts` and `browser-hrm.ts` accept `onLog?: (line: string) => void` — called for each progress line
+- `browser-tsc.ts` and `browser-hrm.ts` accept `onLog?: (line: string) => void` — called for each progress line
 - API routes write each line to a `TransformStream` as it arrives and close the stream on completion
 - `readNdJsonStream(body, onLog)` in `LogForm.tsx` reads the stream, dispatches `log` lines to the UI, and returns the final `result` object
 - `LogStreamLine` / `HrmStreamLine` in `lib/types.ts` are the typed discriminated unions for each line shape

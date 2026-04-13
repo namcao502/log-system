@@ -938,8 +938,8 @@ describe("LogForm -- log banner", () => {
     // Log TSC — response includes logs
     mockFetch.mockReturnValueOnce(
       streamResponse([
-        { type: "log", data: "[browser-log] [0.0s] Browser launched" },
-        { type: "log", data: "[browser-log] [2.1s] Done!" },
+        { type: "log", data: "[browser-tsc] [0.0s] Browser launched" },
+        { type: "log", data: "[browser-tsc] [2.1s] Done!" },
         { type: "result", success: true, cell: "M95" },
       ])
     );
@@ -987,7 +987,7 @@ describe("LogForm -- log banner", () => {
 
     mockFetch.mockReturnValueOnce(
       streamResponse([
-        { type: "log", data: "[browser-log] [0.0s] Browser launched" },
+        { type: "log", data: "[browser-tsc] [0.0s] Browser launched" },
         { type: "result", success: true, cell: "M95" },
       ])
     );
