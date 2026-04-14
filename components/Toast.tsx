@@ -26,11 +26,11 @@ const styles = {
     dismiss: "text-red-400 hover:text-red-600",
   },
   info: {
-    bg: "bg-teal-50",
-    border: "border-teal-200 border-l-teal-500",
-    title: "text-teal-700",
-    detail: "text-teal-600",
-    dismiss: "text-teal-400 hover:text-teal-600",
+    bg: "bg-[var(--t-50)]",
+    border: "border-[var(--t-200)] border-l-[var(--t-500)]",
+    title: "text-[var(--t-700)]",
+    detail: "text-[var(--t-600)]",
+    dismiss: "text-[var(--t-400)] hover:text-[var(--t-600)]",
   },
 };
 

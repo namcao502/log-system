@@ -56,7 +56,7 @@ describe("Toast", () => {
     const { container } = render(
       <ToastComponent toast={makeToast({ type: "info" })} onDismiss={jest.fn()} />
     );
-    expect(container.firstChild).toHaveClass("bg-teal-50");
+    expect(container.firstChild).toHaveClass("bg-[var(--t-50)]");
   });
 });
 

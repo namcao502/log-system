@@ -15,7 +15,7 @@ function getFormattedDate(): string {
 export default function Home() {
   const today = getFormattedDate();
   return (
-    <main className="flex min-h-screen items-start justify-center bg-gradient-to-br from-emerald-100 to-teal-100 px-4 pt-16">
+    <main className="flex min-h-screen items-start justify-center px-4 pt-16">
       <div className="w-full max-w-3xl">
         <AppShell today={today} />
       </div>
