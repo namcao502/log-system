@@ -2,8 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --theme-hue: 160; /* emerald default */
+
+  --t-50:  hsl(var(--theme-hue), 84%, 97%);
+  --t-100: hsl(var(--theme-hue), 77%, 94%);
+  --t-200: hsl(var(--theme-hue), 66%, 87%);
+  --t-300: hsl(var(--theme-hue), 58%, 75%);
+  --t-400: hsl(var(--theme-hue), 59%, 62%);
+  --t-500: hsl(var(--theme-hue), 60%, 50%);
+  --t-600: hsl(var(--theme-hue), 65%, 42%);
+  --t-700: hsl(var(--theme-hue), 70%, 35%);
+  --t-800: hsl(var(--theme-hue), 75%, 28%);
+}
+
 body {
-  @apply bg-gradient-to-br from-emerald-100 to-teal-100 text-gray-900 min-h-screen;
+  @apply text-gray-900 min-h-screen;
+  background: linear-gradient(to bottom right, var(--t-100), var(--t-100));
 }
 
 input:-webkit-autofill,
@@ -15,7 +30,7 @@ input:-webkit-autofill:focus {
 
 .scrollbar-dark {
   scrollbar-width: thin;
-  scrollbar-color: #6ee7b7 transparent; /* emerald-300 thumb, transparent track */
+  scrollbar-color: var(--t-300) transparent;
 }
 
 .scrollbar-dark::-webkit-scrollbar {
@@ -27,6 +42,6 @@ input:-webkit-autofill:focus {
 }
 
 .scrollbar-dark::-webkit-scrollbar-thumb {
-  background-color: #6ee7b7; /* emerald-300 */
+  background-color: var(--t-300);
   border-radius: 9999px;
 }
