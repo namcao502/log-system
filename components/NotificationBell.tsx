@@ -20,7 +20,7 @@ interface NotificationBellProps {
 const typeColors: Record<Notification["type"], string> = {
   success: "text-green-600",
   error: "text-red-600",
-  info: "text-teal-600",
+  info: "text-[var(--t-600)]",
 };
 
 export default function NotificationBell({
@@ -55,7 +55,7 @@ export default function NotificationBell({
         type="button"
         onClick={handleToggle}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 text-lg hover:border-emerald-300"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] text-lg hover:border-[var(--t-300)]"
       >
         &#x1F514;
         {unreadCount > 0 && (
@@ -66,8 +66,8 @@ export default function NotificationBell({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 z-50 w-72 rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-xl">
-          <div className="flex items-center justify-between border-b border-emerald-200 px-4 py-3">
+        <div className="absolute right-0 top-11 z-50 w-72 rounded-xl border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] shadow-xl">
+          <div className="flex items-center justify-between border-b border-[var(--t-200)] px-4 py-3">
             <span className="text-xs font-semibold text-gray-700">Notifications</span>
             {notifications.length > 0 && (
               <button
@@ -83,7 +83,7 @@ export default function NotificationBell({
             {notifications.length === 0 ? (
               <p className="px-4 py-6 text-center text-xs text-gray-400">No notifications</p>
             ) : (
-              <ul className="divide-y divide-emerald-100">
+              <ul className="divide-y divide-[var(--t-50)]">
                 {notifications.map((n) => (
                   <li key={n.id} className="flex items-start justify-between gap-2 px-4 py-3">
                     <div className="min-w-0">
