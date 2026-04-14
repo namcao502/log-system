@@ -29,9 +29,9 @@ export default function ThemePicker({ color, onChange }: ThemePickerProps) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-label="Theme color picker"
         className="relative flex h-9 w-9 items-center justify-center rounded-full border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] text-[var(--t-700)] hover:border-[var(--t-300)]"
       >
-        <span className="sr-only">Theme color picker</span>
         <svg
           width="16"
           height="16"
@@ -54,16 +54,16 @@ export default function ThemePicker({ color, onChange }: ThemePickerProps) {
       {open && (
         <div
           role="dialog"
-          aria-label="Theme picker"
+          aria-label="Theme color picker"
           className="absolute right-0 top-11 z-50 w-44 rounded-xl border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] p-4 shadow-xl shadow-black/10"
         >
-          <label htmlFor="theme-color-input" className="text-[11px] font-semibold uppercase tracking-widest text-[var(--t-700)]">
-            Color
-          </label>
-          <div className="mt-3 flex items-center gap-3">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-[var(--t-700)]">
+            Theme Color
+          </p>
+          <div className="flex items-center gap-3">
             <input
-              id="theme-color-input"
               type="color"
+              aria-label="Color"
               value={color}
               onChange={(e) => onChange(e.target.value)}
               className="h-8 w-8 cursor-pointer rounded border-0 p-0"

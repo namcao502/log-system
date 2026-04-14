@@ -25,7 +25,7 @@ describe("ThemePicker", () => {
   it("color input is pre-filled with current color", () => {
     render(<ThemePicker color="#3b82f6" onChange={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: /theme color picker/i }));
-    const input = screen.getByLabelText(/color/i) as HTMLInputElement;
+    const input = screen.getByLabelText("Color") as HTMLInputElement;
     expect(input.value).toBe("#3b82f6");
   });
 
@@ -33,7 +33,7 @@ describe("ThemePicker", () => {
     const onChange = jest.fn();
     render(<ThemePicker color={DEFAULT_COLOR} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: /theme color picker/i }));
-    fireEvent.change(screen.getByLabelText(/color/i), {
+    fireEvent.change(screen.getByLabelText("Color"), {
       target: { value: "#3b82f6" },
     });
     expect(onChange).toHaveBeenCalledWith("#3b82f6");
