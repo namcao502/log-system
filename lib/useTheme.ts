@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const STORAGE_KEY = "tsc-theme-color";
 export const DEFAULT_COLOR = "#10b981"; // emerald-500, hue ~160
@@ -35,7 +35,16 @@ export function useTheme(): { color: string; setColor: (hex: string) => void } {
     return localStorage.getItem(STORAGE_KEY) ?? DEFAULT_COLOR;
   });
 
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      // On mount: only set the CSS variable, don't write to localStorage.
+      // ThemePicker owns localStorage for rainbow vs. static color.
+      const hue = hexToHue(color);
+      document.documentElement.style.setProperty("--theme-hue", String(hue));
+      return;
+    }
     const hue = hexToHue(color);
     document.documentElement.style.setProperty("--theme-hue", String(hue));
     localStorage.setItem(STORAGE_KEY, color);
