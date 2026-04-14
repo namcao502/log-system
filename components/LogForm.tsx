@@ -356,9 +356,9 @@ export default function LogForm({ onNotify }: LogFormProps) {
     <div className="space-y-2.5">
       <div className="grid grid-cols-2 gap-2.5">
         {/* Tickets card */}
-        <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-5 py-4 space-y-3">
+        <div className="rounded-xl border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] px-5 py-4 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--t-700)]">
               {stagedTickets.length > 0 ? `${LABELS.TICKETS} (${stagedTickets.length}/5)` : LABELS.TICKETS}
             </p>
             {stagedTickets.length > 0 && (
@@ -372,7 +372,7 @@ export default function LogForm({ onNotify }: LogFormProps) {
             )}
           </div>
           <div className="flex flex-col gap-2">
-            <label htmlFor="ticket" className="text-sm font-medium text-emerald-800">
+            <label htmlFor="ticket" className="text-sm font-medium text-[var(--t-800)]">
               {LABELS.TICKET}
             </label>
             <input
@@ -390,16 +390,16 @@ export default function LogForm({ onNotify }: LogFormProps) {
               className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 ${
                 showFormatError
                   ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                  : "border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500"
+                  : "border-[var(--t-200)] focus:border-[var(--t-500)] focus:ring-[var(--t-500)]"
               }`}
             />
             <button
               type="button"
               disabled={!isTicketValid || isJiraLoading}
               onClick={handleVerify}
-              className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white
+              className="w-full rounded-lg bg-[var(--t-600)] px-4 py-2 text-sm font-medium text-white
                          active:scale-95 transition-transform duration-100
-                         hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                         hover:bg-[var(--t-500)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isJiraLoading ? LABELS.VERIFYING : LABELS.VERIFY}
             </button>
@@ -414,7 +414,7 @@ export default function LogForm({ onNotify }: LogFormProps) {
                 return (
                   <li
                     key={item.ticket}
-                    className={`flex items-center justify-between rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm transition-all duration-150 ${
+                    className={`flex items-center justify-between rounded-lg border border-[var(--t-200)] bg-white px-3 py-2 text-sm transition-all duration-150 ${
                       exitingTickets.has(item.ticket) ? "opacity-0 -translate-y-1.5" : "animate-slide-in"
                     }`}
                   >
@@ -427,7 +427,7 @@ export default function LogForm({ onNotify }: LogFormProps) {
                     <button
                       type="button"
                       onClick={() => handleRemoveFromStaged(item.ticket)}
-                      className="ml-3 shrink-0 rounded p-1 text-gray-400 hover:bg-emerald-50 hover:text-red-400"
+                      className="ml-3 shrink-0 rounded p-1 text-gray-400 hover:bg-[var(--t-50)] hover:text-red-400"
                       aria-label={`Remove ${item.ticket}`}
                     >
                       &#x2715;
@@ -440,9 +440,9 @@ export default function LogForm({ onNotify }: LogFormProps) {
         </div>
 
         {/* Dates card */}
-        <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-5 py-4 space-y-3">
+        <div className="rounded-xl border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] px-5 py-4 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--t-700)]">
               {logDates.length > 0 ? `${LABELS.DATES} (${logDates.length}/${MAX_LOG_DATES})` : LABELS.DATES}
             </p>
             {logDates.length > 0 && (
@@ -456,7 +456,7 @@ export default function LogForm({ onNotify }: LogFormProps) {
             )}
           </div>
           <div className="flex flex-col gap-2">
-            <label htmlFor="log-date" className="text-sm font-medium text-emerald-800">
+            <label htmlFor="log-date" className="text-sm font-medium text-[var(--t-800)]">
               {LABELS.DATE}
             </label>
             <DatePickerPopover
@@ -470,9 +470,9 @@ export default function LogForm({ onNotify }: LogFormProps) {
               type="button"
               disabled={!stagingDate || logDates.includes(stagingDate) || logDates.length >= MAX_LOG_DATES}
               onClick={handleAddDate}
-              className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white
+              className="w-full rounded-lg bg-[var(--t-600)] px-4 py-2 text-sm font-medium text-white
                          active:scale-95 transition-transform duration-100
-                         hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                         hover:bg-[var(--t-500)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {LABELS.ADD}
             </button>
@@ -482,7 +482,7 @@ export default function LogForm({ onNotify }: LogFormProps) {
               {logDates.map((d) => (
                 <li
                   key={d}
-                  className="flex items-center justify-between rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-lg border border-[var(--t-200)] bg-white px-3 py-2 text-sm"
                 >
                   <span className="flex flex-col min-w-0">
                     <span className="font-medium text-gray-800">
@@ -499,7 +499,7 @@ export default function LogForm({ onNotify }: LogFormProps) {
                   <button
                     type="button"
                     onClick={() => handleRemoveDate(d)}
-                    className="ml-2 shrink-0 rounded p-1 text-gray-400 hover:bg-emerald-50 hover:text-red-400"
+                    className="ml-2 shrink-0 rounded p-1 text-gray-400 hover:bg-[var(--t-50)] hover:text-red-400"
                     aria-label={`Remove date ${d}`}
                   >
                     &#x2715;
@@ -512,53 +512,53 @@ export default function LogForm({ onNotify }: LogFormProps) {
       </div>
 
       {/* Status card */}
-      <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-5 py-4 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">{LABELS.STATUS}</p>
+      <div className="rounded-xl border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--t-700)]">{LABELS.STATUS}</p>
         <div className="grid grid-cols-2 gap-2.5">
           {/* TSC Log block */}
-          <div className="rounded-lg border border-emerald-200 bg-white px-4 py-3 space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">{LABELS.TSC_LOG}</p>
+          <div className="rounded-lg border border-[var(--t-200)] bg-white px-4 py-3 space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--t-700)]">{LABELS.TSC_LOG}</p>
             <LogPanel logs={tscLogs} />
           </div>
 
           {/* HRM Log block */}
-          <div className="rounded-lg border border-emerald-200 bg-white px-4 py-3 space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">{LABELS.HRM_LOG}</p>
+          <div className="rounded-lg border border-[var(--t-200)] bg-white px-4 py-3 space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--t-700)]">{LABELS.HRM_LOG}</p>
             <LogPanel logs={hrmLogs} />
           </div>
         </div>
       </div>
 
       {/* Actions card */}
-      <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-5 py-4 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-700">{LABELS.ACTIONS}</p>
+      <div className="rounded-xl border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--t-700)]">{LABELS.ACTIONS}</p>
         {stagedTickets.length > 0 && logDates.length > 0 && (
-          <div data-testid="will-log-summary" className="rounded-lg border border-emerald-200 border-l-[3px] border-l-emerald-500 bg-emerald-50 px-4 py-3 text-sm space-y-3">
+          <div data-testid="will-log-summary" className="rounded-lg border border-[var(--t-200)] border-l-[3px] border-l-[var(--t-500)] bg-[var(--t-50)] px-4 py-3 text-sm space-y-3">
             {/* Tickets section */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-600 mb-1.5">{LABELS.TICKETS}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--t-600)] mb-1.5">{LABELS.TICKETS}</p>
               <ul className="space-y-1">
                 {stagedTickets.map((t, i) => {
                   const slots = getTimeSlots(stagedTickets.length, i);
                   const timeStr = slots.map((s) => `${s.start}\u2013${s.end}`).join(" / ");
                   return (
-                    <li key={t.ticket} className="flex items-center gap-2 text-emerald-700">
+                    <li key={t.ticket} className="flex items-center gap-2 text-[var(--t-700)]">
                       <span className="font-medium">{t.ticket}</span>
-                      <span className="text-emerald-500 text-xs">{timeStr}</span>
+                      <span className="text-[var(--t-500)] text-xs">{timeStr}</span>
                     </li>
                   );
                 })}
               </ul>
             </div>
 
-            <div className="border-t border-emerald-200" />
+            <div className="border-t border-[var(--t-200)]" />
 
             {/* Dates section */}
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-600 mb-1.5">{LABELS.DATES}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--t-600)] mb-1.5">{LABELS.DATES}</p>
               <ul className="space-y-1">
                 {logDates.map((d) => (
-                  <li key={d} className="text-emerald-700">{formatDateDisplay(d)}</li>
+                  <li key={d} className="text-[var(--t-700)]">{formatDateDisplay(d)}</li>
                 ))}
               </ul>
             </div>
@@ -570,9 +570,9 @@ export default function LogForm({ onNotify }: LogFormProps) {
               type="button"
               disabled={stagedTickets.length === 0 || logDates.length === 0 || isLogging}
               onClick={handleLogTsc}
-              className="rounded-lg border border-emerald-600 bg-transparent px-4 py-2.5 text-sm font-medium text-emerald-600
+              className="rounded-lg border border-[var(--t-600)] bg-transparent px-4 py-2.5 text-sm font-medium text-[var(--t-600)]
                          active:scale-95 transition-transform duration-100
-                         hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                         hover:bg-[var(--t-50)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {LABELS.LOG_TSC}
             </button>
@@ -580,9 +580,9 @@ export default function LogForm({ onNotify }: LogFormProps) {
               type="button"
               disabled={stagedTickets.length === 0 || isLogging}
               onClick={handleLogHrm}
-              className="rounded-lg border border-teal-700 bg-transparent px-4 py-2.5 text-sm font-medium text-teal-700
+              className="rounded-lg border border-[var(--t-700)] bg-transparent px-4 py-2.5 text-sm font-medium text-[var(--t-700)]
                          active:scale-95 transition-transform duration-100
-                         hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+                         hover:bg-[var(--t-50)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Log HRM ({stagedTickets.length})
             </button>
@@ -591,9 +591,9 @@ export default function LogForm({ onNotify }: LogFormProps) {
             type="button"
             disabled={stagedTickets.length === 0 || isLogging}
             onClick={handleLogAll}
-            className="w-full rounded-lg bg-emerald-800 px-4 py-3 text-sm font-medium text-white
+            className="w-full rounded-lg bg-[var(--t-800)] px-4 py-3 text-sm font-medium text-white
                        active:scale-95 transition-transform duration-100
-                       hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                       hover:bg-[var(--t-700)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {logAllLabel}
           </button>
