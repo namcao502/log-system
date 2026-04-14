@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 
 const STORAGE_KEY = "tsc-theme-color";
-const DEFAULT_COLOR = "#10b981"; // emerald-500, hue ~160
+export const DEFAULT_COLOR = "#10b981"; // emerald-500, hue ~160
 
 function hexToHue(hex: string): number {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return 0;
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;

@@ -1,7 +1,5 @@
 import { renderHook, act } from "@testing-library/react";
-import { useTheme } from "@/lib/useTheme";
-
-const DEFAULT_COLOR = "#10b981";
+import { useTheme, DEFAULT_COLOR } from "@/lib/useTheme";
 
 beforeEach(() => {
   localStorage.clear();
@@ -62,5 +60,16 @@ describe("useTheme", () => {
     );
     // red wraps: hue is 0 or 360
     expect(hue === 0 || hue === 360 || hue < 10).toBe(true);
+  });
+
+  it("falls back to hue 0 for invalid hex input", () => {
+    const { result } = renderHook(() => useTheme());
+    act(() => {
+      result.current.setColor("invalid");
+    });
+    const hue = Number(
+      document.documentElement.style.getPropertyValue("--theme-hue")
+    );
+    expect(hue).toBe(0);
   });
 });
