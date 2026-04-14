@@ -3,8 +3,10 @@
 import { useCallback } from "react";
 import { useNotifications } from "@/lib/useNotifications";
 import { useToasts } from "@/lib/useToasts";
+import { useTheme } from "@/lib/useTheme";
 import type { Notification } from "@/lib/types";
 import NotificationBell from "./NotificationBell";
+import ThemePicker from "./ThemePicker";
 import ToastContainer from "./ToastContainer";
 import LogForm from "./LogForm";
 
@@ -16,6 +18,7 @@ export default function AppShell({ today }: AppShellProps) {
   const { notifications, unreadCount, addNotification, markRead, clearAll } =
     useNotifications();
   const { toasts, addToast, dismissToast } = useToasts();
+  const { color, setColor } = useTheme();
 
   const notify = useCallback(
     (n: Omit<Notification, "id" | "timestamp">) => {
@@ -33,12 +36,15 @@ export default function AppShell({ today }: AppShellProps) {
           <h1 className="text-lg font-semibold text-gray-900">Welcome, Nam Nguyen</h1>
           <p className="mt-1 text-sm text-gray-500">Today: {today}</p>
         </div>
-        <NotificationBell
-          notifications={notifications}
-          unreadCount={unreadCount}
-          onOpen={markRead}
-          onClearAll={clearAll}
-        />
+        <div className="flex items-center gap-2">
+          <ThemePicker color={color} onChange={setColor} />
+          <NotificationBell
+            notifications={notifications}
+            unreadCount={unreadCount}
+            onOpen={markRead}
+            onClearAll={clearAll}
+          />
+        </div>
       </div>
       <div className="mt-6">
         <LogForm onNotify={notify} />
