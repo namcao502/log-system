@@ -28,13 +28,13 @@ describe("LogPanel", () => {
     expect(screen.getByText(/Done/)).toBeInTheDocument();
   });
 
-  it("colorizes prefix in emerald", () => {
+  it("does not render prefix span, shows timestamp and text", () => {
     const { container } = render(
       <LogPanel logs={["[browser-tsc] [0.1s] some text"]} />
     );
-    const prefix = container.querySelector("span.text-emerald-400");
-    expect(prefix).toBeInTheDocument();
-    expect(prefix?.textContent).toBe("[browser-tsc]");
+    expect(container.querySelector("span.text-emerald-400")).not.toBeInTheDocument();
+    expect(screen.getByText(/0\.1s/)).toBeInTheDocument();
+    expect(screen.getByText(/some text/)).toBeInTheDocument();
   });
 
   it("applies fixed height and overflow scroll classes", () => {

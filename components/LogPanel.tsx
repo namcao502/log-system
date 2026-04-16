@@ -5,12 +5,11 @@ import type { ReactNode } from "react";
 function colorizeLogLine(line: string): ReactNode {
   const match = line.match(/^(\[[^\]]+\])( \[\d+\.\d+s\])?(.*)$/);
   if (!match) return <span className="text-gray-400">{line}</span>;
-  const [, prefix, timestamp, rest] = match;
+  const [, , timestamp, rest] = match;
   return (
     <>
-      <span className="text-emerald-400">{prefix}</span>
-      {timestamp && <span className="text-gray-500">{timestamp}</span>}
-      {rest && <span className="text-gray-400">{rest}</span>}
+      {timestamp && <span className="text-gray-500">{timestamp.trimStart()}</span>}
+      {rest && <span className="text-gray-400">{timestamp ? rest : rest.trimStart()}</span>}
     </>
   );
 }
