@@ -12,25 +12,25 @@ const TOAST_DURATION = 4000;
 
 const styles = {
   success: {
-    bg: "bg-green-50",
-    border: "border-green-200 border-l-green-500",
-    title: "text-green-700",
-    detail: "text-green-600",
-    dismiss: "text-green-400 hover:text-green-600",
+    bg: "bg-green-500/10",
+    border: "border-green-500/20 border-l-green-500",
+    title: "text-green-400",
+    detail: "text-green-400/70",
+    dismiss: "text-green-500/50 hover:text-green-400",
   },
   error: {
-    bg: "bg-red-50",
-    border: "border-red-200 border-l-red-500",
-    title: "text-red-700",
-    detail: "text-red-600",
-    dismiss: "text-red-400 hover:text-red-600",
+    bg: "bg-red-500/10",
+    border: "border-red-500/20 border-l-red-500",
+    title: "text-red-400",
+    detail: "text-red-400/70",
+    dismiss: "text-red-500/50 hover:text-red-400",
   },
   info: {
-    bg: "bg-[var(--t-50)]",
-    border: "border-[var(--t-200)] border-l-[var(--t-500)]",
-    title: "text-[var(--t-700)]",
-    detail: "text-[var(--t-600)]",
-    dismiss: "text-[var(--t-400)] hover:text-[var(--t-600)]",
+    bg: "bg-white/5",
+    border: "border-white/10 border-l-[var(--t-400)]",
+    title: "text-[var(--t-300)]",
+    detail: "text-[var(--t-300)]/70",
+    dismiss: "text-[var(--t-400)]/50 hover:text-[var(--t-300)]",
   },
 };
 
@@ -44,7 +44,7 @@ export default function Toast({ toast, onDismiss }: ToastProps) {
 
   return (
     <div
-      className={`flex items-start justify-between gap-3 rounded-lg border border-l-[3px] px-4 py-3 shadow-lg ${s.bg} ${s.border}`}
+      className={`flex items-start justify-between gap-3 rounded-xl border border-l-[3px] px-4 py-3 shadow-2xl backdrop-blur-xl ${s.bg} ${s.border}`}
       role="alert"
     >
       <div className="min-w-0">

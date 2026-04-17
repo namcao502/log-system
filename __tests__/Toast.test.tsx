@@ -42,21 +42,21 @@ describe("Toast", () => {
     const { container } = render(
       <ToastComponent toast={makeToast({ type: "success" })} onDismiss={jest.fn()} />
     );
-    expect(container.firstChild).toHaveClass("bg-green-50");
+    expect(container.firstChild).toHaveClass("bg-green-500/10");
   });
 
   it("applies red styling for error type", () => {
     const { container } = render(
       <ToastComponent toast={makeToast({ type: "error" })} onDismiss={jest.fn()} />
     );
-    expect(container.firstChild).toHaveClass("bg-red-50");
+    expect(container.firstChild).toHaveClass("bg-red-500/10");
   });
 
   it("applies teal styling for info type", () => {
     const { container } = render(
       <ToastComponent toast={makeToast({ type: "info" })} onDismiss={jest.fn()} />
     );
-    expect(container.firstChild).toHaveClass("bg-[var(--t-50)]");
+    expect(container.firstChild).toHaveClass("bg-white/5");
   });
 });
 

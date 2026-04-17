@@ -33,8 +33,8 @@ export default function AppShell({ today }: AppShellProps) {
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">Welcome, Nam Nguyen</h1>
-          <p className="mt-1 text-sm text-gray-500">Today: {today}</p>
+          <h1 className="text-lg font-semibold text-white/95">Welcome, Nam Nguyen</h1>
+          <p className="mt-1 text-sm text-white/45">Today: {today}</p>
         </div>
         <div className="flex items-center gap-2">
           <ThemePicker color={color} onChange={setColor} />

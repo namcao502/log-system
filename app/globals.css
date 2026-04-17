@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --theme-hue: 160; /* emerald default */
+  --theme-hue: 160;
 
   --t-50:  hsl(var(--theme-hue), 84%, 97%);
   --t-100: hsl(var(--theme-hue), 77%, 94%);
@@ -17,31 +17,186 @@
 }
 
 body {
-  @apply text-gray-900 min-h-screen;
-  background: linear-gradient(to bottom right, var(--t-100), var(--t-100));
+  @apply text-white min-h-screen;
+  background: #0d0d2b;
 }
 
+/* Aurora blobs */
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.5;
+}
+
+.aurora-blob-1 {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, hsl(calc(var(--theme-hue) + 0), 80%, 60%) 0%, hsl(calc(var(--theme-hue) + 10), 75%, 50%) 60%, transparent 100%);
+  top: -150px; left: -100px;
+  animation: aurora-float-1 12s ease-in-out infinite alternate;
+}
+.aurora-blob-2 {
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, hsl(calc(var(--theme-hue) + 72), 80%, 65%) 0%, hsl(calc(var(--theme-hue) + 82), 70%, 55%) 60%, transparent 100%);
+  top: 100px; right: -80px;
+  animation: aurora-float-2 15s ease-in-out infinite alternate;
+}
+.aurora-blob-3 {
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, hsl(calc(var(--theme-hue) + 144), 75%, 60%) 0%, hsl(calc(var(--theme-hue) + 154), 70%, 50%) 60%, transparent 100%);
+  bottom: 50px; left: 200px;
+  animation: aurora-float-3 10s ease-in-out infinite alternate;
+}
+.aurora-blob-4 {
+  width: 350px; height: 350px;
+  background: radial-gradient(circle, hsl(calc(var(--theme-hue) + 216), 80%, 65%) 0%, hsl(calc(var(--theme-hue) + 226), 75%, 55%) 60%, transparent 100%);
+  bottom: -50px; right: 100px;
+  animation: aurora-float-4 13s ease-in-out infinite alternate;
+}
+.aurora-blob-5 {
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, hsl(calc(var(--theme-hue) + 288), 80%, 65%) 0%, hsl(calc(var(--theme-hue) + 298), 70%, 55%) 50%, transparent 100%);
+  top: 40%; left: 40%;
+  opacity: 0.25;
+  animation: aurora-float-5 18s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-float-1 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(60px, 80px) scale(1.15); }
+}
+@keyframes aurora-float-2 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-80px, 60px) scale(1.1); }
+}
+@keyframes aurora-float-3 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(40px, -70px) scale(1.2); }
+}
+@keyframes aurora-float-4 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-50px, -40px) scale(1.05); }
+}
+@keyframes aurora-float-5 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-80px, 50px) scale(1.3); }
+}
+
+/* Glass utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Glass form elements */
+.glass-input {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 0.625rem;
+  transition: all 0.2s;
+}
+
+.glass-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.glass-input:focus {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+  outline: none;
+}
+
+/* Glass buttons */
+.btn-glass-primary {
+  background: color-mix(in srgb, var(--t-500) 75%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: white;
+  border: none;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--t-500) 40%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.15s;
+}
+
+.btn-glass-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--t-500) 92%, transparent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--t-500) 55%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.btn-glass-outline {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.15s;
+}
+
+.btn-glass-outline:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-glass-all {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--t-700) 80%, transparent) 0%,
+    color-mix(in srgb, var(--t-500) 80%, transparent) 100%
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: none;
+  color: white;
+  box-shadow: 0 4px 24px color-mix(in srgb, var(--t-600) 50%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: all 0.15s;
+}
+
+.btn-glass-all:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 30px color-mix(in srgb, var(--t-600) 60%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Glass list item */
+.glass-item {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Autofill override (dark) */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0px 1000px white inset;
-  box-shadow: 0 0 0px 1000px white inset;
+  -webkit-box-shadow: 0 0 0px 1000px rgba(20, 20, 50, 0.9) inset;
+  box-shadow: 0 0 0px 1000px rgba(20, 20, 50, 0.9) inset;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.9);
 }
 
 .scrollbar-dark {
   scrollbar-width: thin;
-  scrollbar-color: var(--t-300) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
-.scrollbar-dark::-webkit-scrollbar {
-  width: 4px;
-}
-
-.scrollbar-dark::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+.scrollbar-dark::-webkit-scrollbar { width: 4px; }
+.scrollbar-dark::-webkit-scrollbar-track { background: transparent; }
 .scrollbar-dark::-webkit-scrollbar-thumb {
-  background-color: var(--t-300);
+  background-color: rgba(255, 255, 255, 0.15);
   border-radius: 9999px;
 }

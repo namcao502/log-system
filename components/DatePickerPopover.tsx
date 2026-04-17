@@ -91,9 +91,7 @@ export default function DatePickerPopover({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-full rounded-lg border border-[var(--t-200)] bg-white px-3 py-2 text-sm text-gray-800
-                   text-left transition-colors
-                   focus:border-[var(--t-500)] focus:outline-none focus:ring-1 focus:ring-[var(--t-500)]"
+        className="w-full rounded-lg px-3 py-2 text-sm text-left transition-colors glass-input"
       >
         {displayDate(value)}
       </button>
@@ -102,7 +100,7 @@ export default function DatePickerPopover({
         <div
           role="dialog"
           aria-label={LABELS.DATE_PICKER_ARIA}
-          className="absolute left-0 top-full z-50 mt-1 rounded-xl border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] p-3 shadow-xl shadow-black/10"
+          className="absolute left-0 top-full z-50 mt-1 rounded-xl glass p-3 shadow-2xl"
         >
           <DayPicker
             mode="single"
@@ -116,26 +114,24 @@ export default function DatePickerPopover({
             classNames={{
               months: "flex",
               month: "w-full",
-              month_caption:
-                "flex items-center justify-between mb-3 px-1",
-              caption_label: "text-sm font-semibold text-gray-900",
+              month_caption: "flex items-center justify-between mb-3 px-1",
+              caption_label: "text-sm font-semibold text-white/90",
               nav: "flex gap-1",
               button_previous:
-                "p-1.5 rounded-lg hover:bg-[var(--t-100)] text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
+                "p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
               button_next:
-                "p-1.5 rounded-lg hover:bg-[var(--t-100)] text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
+                "p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
               month_grid: "w-full border-collapse",
               weekdays: "",
-              weekday:
-                "text-[11px] font-medium text-gray-400 w-9 text-center pb-2",
+              weekday: "text-[11px] font-medium text-white/30 w-9 text-center pb-2",
               week: "",
               day: "text-center p-0.5",
               day_button:
-                "h-8 w-8 mx-auto rounded-lg text-sm text-gray-700 hover:bg-[var(--t-100)] hover:text-gray-900 transition-colors flex items-center justify-center",
+                "h-8 w-8 mx-auto rounded-lg text-sm text-white/75 hover:bg-white/15 hover:text-white transition-colors flex items-center justify-center",
               selected:
-                "[&>button]:!bg-[var(--t-600)] [&>button]:!text-white [&>button]:hover:!bg-[var(--t-500)]",
+                "[&>button]:!bg-[var(--t-500)] [&>button]:!text-white [&>button]:hover:!bg-[var(--t-400)]",
               today:
-                "[&>button]:font-bold [&>button]:text-[var(--t-600)]",
+                "[&>button]:font-bold [&>button]:text-[var(--t-300)]",
               outside: "opacity-30",
               disabled:
                 "[&>button]:!opacity-20 [&>button]:cursor-not-allowed",

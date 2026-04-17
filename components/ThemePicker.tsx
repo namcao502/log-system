@@ -89,7 +89,7 @@ export default function ThemePicker({ color, onChange }: ThemePickerProps) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Theme color picker"
-        className="relative flex h-9 w-9 items-center justify-center rounded-full border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] text-[var(--t-700)] hover:border-[var(--t-300)]"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full glass text-white/75 hover:bg-white/15 transition-colors"
       >
         <svg
           width="16"
@@ -114,24 +114,32 @@ export default function ThemePicker({ color, onChange }: ThemePickerProps) {
         <div
           role="dialog"
           aria-label="Theme color picker"
-          className="absolute right-0 top-11 z-50 w-44 rounded-xl border border-[var(--t-200)] bg-gradient-to-br from-[var(--t-50)] to-[var(--t-50)] p-4 shadow-xl shadow-black/10"
+          className="absolute right-0 top-11 z-50 w-44 rounded-xl glass p-4 shadow-2xl"
         >
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-[var(--t-700)]">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-white/40">
             Theme Color
           </p>
           <div className="flex items-center gap-3">
-            <input
-              type="color"
-              aria-label="Color"
-              value={color}
-              onChange={(e) => {
-                cancelAnimationFrame(rafRef.current);
-                localStorage.removeItem(RAINBOW_KEY);
-                setRainbow(false);
-                onChange(e.target.value);
-              }}
-              className="h-8 w-8 cursor-pointer rounded border-0 p-0"
-            />
+            {rainbow ? (
+              <div
+                aria-label="Color (rainbow active)"
+                className="h-8 w-8 rounded cursor-default"
+                style={{ background: "linear-gradient(135deg, #ef4444, #f97316, #eab308, #22c55e, #3b82f6, #8b5cf6, #ef4444)" }}
+              />
+            ) : (
+              <input
+                type="color"
+                aria-label="Color"
+                value={color}
+                onChange={(e) => {
+                  cancelAnimationFrame(rafRef.current);
+                  localStorage.removeItem(RAINBOW_KEY);
+                  setRainbow(false);
+                  onChange(e.target.value);
+                }}
+                className="h-8 w-8 cursor-pointer rounded border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none"
+              />
+            )}
             <button
               type="button"
               onClick={() => {
@@ -140,7 +148,7 @@ export default function ThemePicker({ color, onChange }: ThemePickerProps) {
                 setRainbow(false);
                 onChange(DEFAULT_COLOR);
               }}
-              className="text-xs text-gray-500 hover:text-red-400"
+              className="text-xs text-white/40 hover:text-red-400"
             >
               Reset
             </button>
