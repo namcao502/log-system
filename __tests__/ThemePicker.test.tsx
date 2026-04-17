@@ -4,6 +4,16 @@ import ThemePicker from "@/components/ThemePicker";
 const DEFAULT_COLOR = "#10b981";
 
 describe("ThemePicker", () => {
+  beforeEach(() => {
+    localStorage.setItem("tsc-theme-color", DEFAULT_COLOR);
+    jest.spyOn(window, "requestAnimationFrame").mockReturnValue(0 as unknown as ReturnType<typeof requestAnimationFrame>);
+    jest.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    jest.restoreAllMocks();
+  });
   it("renders the palette button with accessible label", () => {
     render(<ThemePicker color={DEFAULT_COLOR} onChange={() => {}} />);
     expect(
