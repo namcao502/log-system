@@ -117,7 +117,7 @@ async function attemptWrite(
 
   try {
     context = await chromium.launchPersistentContext(PLAYWRIGHT_PROFILE_DIR, {
-      channel: "msedge",
+      channel: "chrome",
       headless: false,
       args: ["--disable-blink-features=AutomationControlled"],
       viewport: { width: 1280, height: 800 },

@@ -279,7 +279,7 @@ export async function logTicketsToHrm(
 
   try {
     context = await chromium.launchPersistentContext(HRM_PROFILE_DIR, {
-      channel: "msedge",
+      channel: "chrome",
       headless: false,
       args: ["--disable-blink-features=AutomationControlled"],
       viewport: { width: 1400, height: 900 },
