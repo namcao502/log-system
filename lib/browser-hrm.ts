@@ -1,4 +1,4 @@
-import { chromium, type BrowserContext, type Page } from "playwright";
+import { chromium, type BrowserContext, type Page, type Frame } from "playwright";
 import path from "path";
 import os from "os";
 import { getTimeSlots, type TimeSlot } from "./time-slots";
@@ -20,41 +20,150 @@ function getDateString(date: Date): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
+/** Returns all date format variants the HRM page might display. */
+function getDateVariants(date: Date): string[] {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const dd = parts.find((p) => p.type === "day")!.value;   // "22"
+  const mm = parts.find((p) => p.type === "month")!.value; // "04"
+  const yyyy = parts.find((p) => p.type === "year")!.value;
+  const d = String(parseInt(dd, 10));   // "22" (no change, but future-safe)
+  const m = String(parseInt(mm, 10));   // "4"  (no leading zero)
+
+  return [
+    `${dd}/${mm}/${yyyy}`, // 22/04/2026
+    `${d}/${m}/${yyyy}`,   // 22/4/2026
+    `${dd}/${m}/${yyyy}`,  // 22/4/2026 mixed
+    `${d}/${mm}/${yyyy}`,  // 22/04/2026 mixed
+  ].filter((v, i, a) => a.indexOf(v) === i); // dedupe
+}
+
 async function waitForAngular(page: Page, ms = 1000): Promise<void> {
   await page.waitForTimeout(ms);
 }
 
-async function findTodayAddButton(page: Page, todayStr: string, emit: (line: string) => void): Promise<boolean> {
-  const selector = `div.tw-w-\\[20\\%\\]:has-text("${todayStr}") button.ant-btn`;
-  try {
-    const btn = page.locator(selector).first();
-    if (await btn.isVisible({ timeout: 3000 })) {
-      await btn.click();
-      emit(`[hrm-log] Clicked "+ Thêm task" for ${todayStr}`);
-      return true;
+/**
+ * Ensures the page is on the HRM timesheet. If MSAL redirected to Microsoft
+ * login, waits up to 2 minutes for the user to authenticate, then navigates
+ * back to the timesheet and confirms it loaded.
+ * Returns an error string if auth timed out, null on success.
+ */
+async function ensureAuthenticated(
+  page: Page,
+  emit: (line: string) => void,
+  elapsed: () => string,
+): Promise<string | null> {
+  await page.goto(HRM_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+  emit(`[hrm-log] [${elapsed()}] Page loaded: ${page.url()}`);
+
+  // Wait for MSAL.js to fire its client-side redirect (if session expired)
+  await waitForAngular(page, 2000);
+
+  const onHrm = () => page.url().includes("hrm.nois.vn") && !page.url().includes("/login");
+
+  if (!onHrm()) {
+    emit(`[hrm-log] [${elapsed()}] Session expired -- please log in in the browser window that just opened...`);
+    try {
+      await page.waitForURL((url) => url.hostname === "hrm.nois.vn", { timeout: 120_000 });
+    } catch {
+      return "Timed out waiting for HRM login. Please log in within 2 minutes and try again.";
     }
-  } catch {
-    emit(`[hrm-log] Primary selector failed for ${todayStr}`);
+    emit(`[hrm-log] [${elapsed()}] Login complete -- navigating to timesheet...`);
+    // OAuth redirects to hrm.nois.vn/ (root); go to the actual timesheet page
+    await page.goto(HRM_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await waitForAngular(page, 3000);
   }
 
-  emit("[hrm-log] Trying JS fallback to find button...");
-  const clicked = await page.evaluate((today) => {
-    const headers = document.querySelectorAll("div[class*='tw-bg']");
-    for (const header of headers) {
-      if (header.textContent?.includes(today)) {
-        const btn = header.querySelector("button");
-        if (btn) {
-          btn.click();
-          return true;
+  try {
+    await page.waitForSelector("text=Timesheet", { timeout: 15000 });
+    emit(`[hrm-log] [${elapsed()}] Timesheet ready`);
+  } catch {
+    emit(`[hrm-log] [${elapsed()}] Timesheet selector not found, continuing...`);
+  }
+
+  return null;
+}
+
+async function searchFrameForButton(
+  frame: Frame,
+  dateVariants: string[],
+): Promise<{ clicked: boolean; variant: string | null; frameName: string; diag: string[] }> {
+  const frameName = frame.name() || frame.url();
+  return frame.evaluate(
+    ([variants, fname]) => {
+      const allText: string[] = [];
+      document.querySelectorAll("div, span, td, th").forEach((el) => {
+        const t = el.textContent?.trim() ?? "";
+        if (/\d{1,2}\/\d{1,2}\/\d{4}/.test(t) && t.length < 80) allText.push(t);
+      });
+
+      for (const variant of variants) {
+        // Use TreeWalker to find the actual text node rendering the date.
+        // This avoids ancestor elements that contain multiple date columns.
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        let textNode: Node | null;
+        while ((textNode = walker.nextNode())) {
+          if (!textNode.textContent?.includes(variant)) continue;
+
+          // Start from the element containing this text node and walk up,
+          // stopping as soon as we find a container that has a button.
+          // Limit depth so we don't escape the day column into a shared parent.
+          let node: Element | null = (textNode as Text).parentElement;
+          for (let depth = 0; depth < 6; depth++) {
+            if (!node) break;
+            const btn = node.querySelector("button");
+            if (btn instanceof HTMLButtonElement && !btn.disabled) {
+              btn.click();
+              return { clicked: true, variant, frameName: fname, diag: allText.slice(0, 10) };
+            }
+            node = node.parentElement;
+          }
         }
       }
-    }
-    return false;
-  }, todayStr);
+      return { clicked: false, variant: null, frameName: fname, diag: allText.slice(0, 10) };
+    },
+    [dateVariants, frameName] as [string[], string],
+  );
+}
 
-  if (clicked) {
-    emit(`[hrm-log] Clicked "+ Thêm task" via JS fallback`);
-    return true;
+async function findTodayAddButton(page: Page, todayStr: string, emit: (line: string) => void, dateVariants: string[]): Promise<boolean> {
+  const frames = page.frames();
+  emit(`[hrm-log] Searching ${frames.length} frame(s) for date button...`);
+
+  for (const frame of frames) {
+    // Playwright locator: scope button to the same container as the date text
+    for (const variant of dateVariants) {
+      try {
+        // Find the most specific element containing the date text that also has a button inside it
+        const container = frame.locator(`div:has-text("${variant}")`).filter({
+          has: frame.locator("button"),
+        }).last();
+        if (await container.isVisible({ timeout: 1500 }).catch(() => false)) {
+          await container.locator("button").first().click();
+          emit(`[hrm-log] Clicked "+ Thêm task" for ${variant} via Playwright`);
+          return true;
+        }
+      } catch {
+        // continue to JS fallback
+      }
+    }
+
+    // JS fallback using TreeWalker for precise text node location
+    try {
+      const result = await searchFrameForButton(frame, dateVariants);
+      emit(`[hrm-log] Frame date texts: ${result.diag.join(" | ") || "(none)"}`);
+      if (result.clicked) {
+        emit(`[hrm-log] Clicked "+ Thêm task" via JS (variant: ${result.variant})`);
+        return true;
+      }
+    } catch {
+      // frame navigated away; skip
+    }
   }
 
   emit(`[hrm-log] Could not find "+ Thêm task" for ${todayStr}`);
@@ -273,7 +382,8 @@ export async function logTicketsToHrm(
     onLog?.(line);
   };
 
-  emit(`[hrm-log] Tickets: ${tickets.join(", ")}, Date: ${todayStr}`);
+  const dateVariants = getDateVariants(date ?? new Date());
+  emit(`[hrm-log] Tickets: ${tickets.join(", ")}, Date: ${todayStr} (variants: ${dateVariants.join(", ")})`);
 
   let context: BrowserContext | null = null;
 
@@ -288,14 +398,10 @@ export async function logTicketsToHrm(
 
     const page = context.pages()[0] || (await context.newPage());
 
-    await page.goto(HRM_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
-    emit(`[hrm-log] [${elapsed()}] Page loaded`);
-
-    try {
-      await page.waitForSelector("text=Timesheet", { timeout: 15000 });
-      emit(`[hrm-log] [${elapsed()}] Timesheet visible`);
-    } catch {
-      emit(`[hrm-log] [${elapsed()}] Timesheet text not found, continuing...`);
+    const authError = await ensureAuthenticated(page, emit, elapsed);
+    if (authError) {
+      await context.close();
+      return { success: false, error: authError, logs };
     }
     await waitForAngular(page, 1000);
 
@@ -304,7 +410,7 @@ export async function logTicketsToHrm(
       const slots = getTimeSlots(tickets.length, i);
       emit(`[hrm-log] [${elapsed()}] Processing ticket ${i + 1}/${tickets.length}: ${ticket}`);
 
-      const found = await findTodayAddButton(page, todayStr, emit);
+      const found = await findTodayAddButton(page, todayStr, emit, dateVariants);
       if (!found) {
         await context.close();
         return { success: false, error: `Could not find today's date (${todayStr}) or "+ Thêm task" button.`, logs };

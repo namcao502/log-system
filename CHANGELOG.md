@@ -1,9 +1,40 @@
 # Changelog
 
+## [AURORA-GLASSMORPHISM-UI] - 2026-04-21
+### Changed
+- Applied aurora animated background (`aurora-blob-*`) with 5 radial gradient blobs that float via CSS keyframe animations
+- All cards and popovers use glassmorphism (`glass` utility class: `backdrop-blur`, semi-transparent background, border glow)
+- Aurora blobs and background body color all respond to `--theme-hue` for a unified theme
+
+## [RAINBOW-THEME] - 2026-04-21
+### Added
+- Rainbow mode in `ThemePicker`: animates `--theme-hue` continuously via `requestAnimationFrame`
+- Hue position is saved to `localStorage` on `beforeunload` and restored on next load
+- Rainbow state toggled with a single gradient button; stopping rainbow snaps to the current animated hue
+### Changed
+- `ThemePicker` dialog uses `role="dialog"` and `aria-label` for accessibility compliance
+
+## [LOGPANEL-STREAMLINE] - 2026-04-21
+### Changed
+- Removed prefix `<span>` from `LogPanel`; log lines render as plain text inside the `<pre>` block
+- Log line format is now emitted fully by the backend stream rather than split at the component level
+
+## [BROWSER-CHANNEL-CHROME] - 2026-04-21
+### Fixed
+- Changed Playwright browser channel from `msedge` to `chrome` in both `browser-tsc.ts` and `browser-hrm.ts`
+
+## [THEME-SYSTEM] - 2026-04-15
+### Added
+- CSS custom property theme: `--theme-hue` drives `--t-50` through `--t-800` tokens in `globals.css`
+- `useTheme` hook (`lib/useTheme.ts`): persists chosen color to `localStorage`, extracts hue via `hexToHue`
+- `ThemePicker` component: color picker popover wired into `AppShell` header
+- `ThemePicker` wired to `useTheme` in `AppShell`; all components reference `--t-*` variables instead of hard-coded emerald/teal classes
+
 ## [RENAME-BROWSER-TSC] - 2026-04-13
 ### Changed
 - Renamed `lib/browser-log.ts` to `lib/browser-tsc.ts` for consistency with `browser-hrm.ts`
 - Log prefix changed from `[browser-log]` to `[browser-tsc]` in all stream output
+- Added date validation in `app/api/sharepoint/log/route.ts` and `app/api/hrm/log/route.ts`
 
 ## [TEAL-RETHEME-NOTIFICATIONS] - 2026-04-03
 ### Added
@@ -28,7 +59,6 @@
 - Added slide-in entry animation and fade/slide exit animation for ticket chips
 - Added `fading` prop to `StatusIndicator` for 500ms fade-out before status clears
 - Added `active:scale-95` press micro-interaction on all action buttons
-- Color palette: slate-950 page bg, slate-800 cards, blue/teal/violet accents per action
 
 ## [UX-IMPROVEMENTS] - 2026-04-03
 ### Changed

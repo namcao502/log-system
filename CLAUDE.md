@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Language:** TypeScript (strict mode, no `any`)
 - **Styling:** Tailwind CSS
 - **Testing:** Jest + React Testing Library
-- **Browser Automation:** Playwright (Edge) — writes to Excel Online and HRM via browser
+- **Browser Automation:** Playwright (Chrome) — writes to Excel Online and HRM via browser
 - **Date Picker:** `react-day-picker`
 - **External APIs:** Jira Cloud REST API
 

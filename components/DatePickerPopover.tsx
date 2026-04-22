@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
 import { LABELS } from "@/lib/constants";
 
@@ -10,6 +11,13 @@ interface DatePickerPopoverProps {
   onChange: (date: string) => void;
   min?: string;
   max?: string;
+}
+
+interface PopoverPos {
+  top?: number;
+  bottom?: number;
+  left: number;
+  width: number;
 }
 
 function toDate(str: string): Date | undefined {
@@ -44,14 +52,33 @@ export default function DatePickerPopover({
   max,
 }: DatePickerPopoverProps) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<PopoverPos | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
+  // Compute fixed position from trigger rect each time the popover opens.
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const calHeight = 320;
+    if (spaceBelow >= calHeight || rect.top < calHeight) {
+      setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    } else {
+      setPos({ bottom: window.innerHeight - rect.top + 4, left: rect.left, width: rect.width });
+    }
+  }, [open]);
+
+  // Close on outside click (checking both trigger and portaled popover).
   useEffect(() => {
     if (!open) return;
     function onMouseDown(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        popoverRef.current?.contains(target)
+      ) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
@@ -70,8 +97,18 @@ export default function DatePickerPopover({
   const fromDate = min ? toDate(min) : undefined;
   const toDateBound = max ? toDate(max) : undefined;
 
+  const popoverStyle: React.CSSProperties = pos
+    ? {
+        position: "fixed",
+        left: pos.left,
+        width: pos.width,
+        ...(pos.top !== undefined ? { top: pos.top } : { bottom: pos.bottom }),
+        zIndex: 9999,
+      }
+    : { display: "none" };
+
   return (
-    <div ref={containerRef} className="relative w-full">
+    <div className="relative w-full">
       {/* Hidden real input keeps tests and screen readers working */}
       <input
         id={id}
@@ -87,6 +124,7 @@ export default function DatePickerPopover({
 
       {/* Visual trigger button */}
       <button
+        ref={triggerRef}
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -96,50 +134,54 @@ export default function DatePickerPopover({
         {displayDate(value)}
       </button>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label={LABELS.DATE_PICKER_ARIA}
-          className="absolute left-0 top-full z-50 mt-1 rounded-xl glass p-3 shadow-2xl"
-        >
-          <DayPicker
-            mode="single"
-            selected={selected}
-            onSelect={handleSelect}
-            defaultMonth={selected}
-            disabled={[
-              ...(fromDate ? [{ before: fromDate }] : []),
-              ...(toDateBound ? [{ after: toDateBound }] : []),
-            ]}
-            classNames={{
-              months: "flex",
-              month: "w-full",
-              month_caption: "flex items-center justify-between mb-3 px-1",
-              caption_label: "text-sm font-semibold text-white/90",
-              nav: "flex gap-1",
-              button_previous:
-                "p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
-              button_next:
-                "p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
-              month_grid: "w-full border-collapse",
-              weekdays: "",
-              weekday: "text-[11px] font-medium text-white/30 w-9 text-center pb-2",
-              week: "",
-              day: "text-center p-0.5",
-              day_button:
-                "h-8 w-8 mx-auto rounded-lg text-sm text-white/75 hover:bg-white/15 hover:text-white transition-colors flex items-center justify-center",
-              selected:
-                "[&>button]:!bg-[var(--t-500)] [&>button]:!text-white [&>button]:hover:!bg-[var(--t-400)]",
-              today:
-                "[&>button]:font-bold [&>button]:text-[var(--t-300)]",
-              outside: "opacity-30",
-              disabled:
-                "[&>button]:!opacity-20 [&>button]:cursor-not-allowed",
-              hidden: "invisible",
-            }}
-          />
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            role="dialog"
+            aria-label={LABELS.DATE_PICKER_ARIA}
+            style={popoverStyle}
+            className="rounded-xl glass p-3 shadow-2xl"
+          >
+            <DayPicker
+              mode="single"
+              selected={selected}
+              onSelect={handleSelect}
+              defaultMonth={selected}
+              disabled={[
+                ...(fromDate ? [{ before: fromDate }] : []),
+                ...(toDateBound ? [{ after: toDateBound }] : []),
+              ]}
+              classNames={{
+                months: "flex",
+                month: "w-full",
+                month_caption: "flex items-center justify-between mb-3 px-1",
+                caption_label: "text-sm font-semibold text-white/90",
+                nav: "flex gap-1",
+                button_previous:
+                  "p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
+                button_next:
+                  "p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white/80 transition-colors disabled:opacity-20 disabled:cursor-not-allowed",
+                month_grid: "w-full border-collapse",
+                weekdays: "",
+                weekday: "text-[11px] font-medium text-white/30 w-9 text-center pb-2",
+                week: "",
+                day: "text-center p-0.5",
+                day_button:
+                  "h-8 w-8 mx-auto rounded-lg text-sm text-white/75 hover:bg-white/15 hover:text-white transition-colors flex items-center justify-center",
+                selected:
+                  "[&>button]:!bg-[var(--t-500)] [&>button]:!text-white [&>button]:hover:!bg-[var(--t-400)]",
+                today:
+                  "[&>button]:font-bold [&>button]:text-[var(--t-300)]",
+                outside: "opacity-30",
+                disabled:
+                  "[&>button]:!opacity-20 [&>button]:cursor-not-allowed",
+                hidden: "invisible",
+              }}
+            />
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

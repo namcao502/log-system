@@ -13,7 +13,7 @@ A personal productivity tool that automates logging Jira tickets (MDP-xxxx) to a
 
 - **Next.js 15** (App Router) + TypeScript (strict)
 - **Tailwind CSS**
-- **Playwright** (Edge) for browser automation
+- **Playwright** (Chrome) for browser automation
 - **Jest** + React Testing Library
 
 ## Setup
@@ -66,7 +66,7 @@ npm test         # Run all tests
 app/
   page.tsx                    # Server component - renders AppShell with formatted date
   layout.tsx                  # Root layout with Inter font
-  globals.css                 # Tailwind directives
+  globals.css                 # Tailwind directives, CSS custom property theme system, aurora animations
   api/
     jira/verify/route.ts      # GET  /api/jira/verify?ticket=MDP-xxxx
     sharepoint/log/route.ts   # POST /api/sharepoint/log
@@ -80,12 +80,14 @@ lib/
   time-slots.ts               # Divides 9:00-18:00 workday evenly across N tickets
   useNotifications.ts         # Hook: persistent notification list (addNotification, markRead, clearAll)
   useToasts.ts                # Hook: transient toast list (addToast, dismissToast)
+  useTheme.ts                 # Hook: CSS variable theme system with localStorage persistence
 components/
-  AppShell.tsx                # Client shell - wires notifications + toasts, renders header + LogForm
+  AppShell.tsx                # Client shell - wires notifications, toasts, theme, renders header + LogForm
   LogForm.tsx                 # Main client component - all state and log orchestration
   LogPanel.tsx                # Scrollable dark-terminal pre block for streaming log lines
   DatePickerPopover.tsx       # Calendar popover (react-day-picker) with hidden <input type="date">
   NotificationBell.tsx        # Bell icon with unread badge and dropdown
+  ThemePicker.tsx             # Color picker popover with rainbow animation mode
   Toast.tsx                   # Single auto-dismissing toast (4 s)
   ToastContainer.tsx          # Fixed top-right stack of active toasts
 __tests__/
@@ -98,6 +100,15 @@ __tests__/
   browser-hrm.test.ts
   jira.test.ts
 ```
+
+## Theme System
+
+The UI uses a CSS custom property theme (`--theme-hue`) for a fully dynamic color palette:
+
+- `globals.css` defines `--t-50` through `--t-800` tokens derived from `--theme-hue`
+- `useTheme` hook reads/writes the hue via `localStorage` and sets the CSS variable on mount
+- `ThemePicker` provides a color picker popover with an optional **Rainbow** mode that animates the hue continuously via `requestAnimationFrame`
+- Aurora background blobs (`aurora-blob-*`) also respond to `--theme-hue`, keeping the background in sync with the chosen color
 
 ## Excel File Details
 
@@ -115,3 +126,4 @@ __tests__/
 - Dates stored as `YYYY-MM-DD`, displayed via `Intl.DateTimeFormat`
 - Timezone: Asia/Ho_Chi_Minh
 - Jira verify status clears after 20 s; log status clears after 10 s
+- Browser channel: Chrome (both TSC and HRM Playwright sessions)
