@@ -26,11 +26,11 @@ const styles = {
     dismiss: "text-red-500/50 hover:text-red-400",
   },
   info: {
-    bg: "bg-white/5",
-    border: "border-white/10 border-l-[var(--t-400)]",
-    title: "text-[var(--t-300)]",
-    detail: "text-[var(--t-300)]/70",
-    dismiss: "text-[var(--t-400)]/50 hover:text-[var(--t-300)]",
+    bg: "bg-[var(--md-surface-container)]",
+    border: "border-[var(--md-outline-variant)] border-l-[var(--md-primary)]",
+    title: "text-[var(--md-primary)]",
+    detail: "text-[var(--md-on-surface-variant)]",
+    dismiss: "text-[var(--md-on-surface-variant)] hover:text-[var(--md-primary)]",
   },
 };
 
@@ -44,7 +44,7 @@ export default function Toast({ toast, onDismiss }: ToastProps) {
 
   return (
     <div
-      className={`flex items-start justify-between gap-3 rounded-xl border border-l-[3px] px-4 py-3 shadow-2xl backdrop-blur-xl ${s.bg} ${s.border}`}
+      className={`flex items-start justify-between gap-3 rounded-2xl border border-l-[3px] px-4 py-3 shadow-2xl ${s.bg} ${s.border}`}
       role="alert"
     >
       <div className="min-w-0">

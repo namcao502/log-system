@@ -89,7 +89,7 @@ export default function ThemePicker({ color, onChange }: ThemePickerProps) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label="Theme color picker"
-        className="relative flex h-9 w-9 items-center justify-center rounded-full glass text-white/75 hover:bg-white/15 transition-colors"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full md-surface text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)] transition-colors"
       >
         <svg
           width="16"
@@ -114,9 +114,9 @@ export default function ThemePicker({ color, onChange }: ThemePickerProps) {
         <div
           role="dialog"
           aria-label="Theme color picker"
-          className="absolute right-0 top-11 z-50 w-44 rounded-xl glass p-4 shadow-2xl"
+          className="absolute right-0 top-11 z-50 w-44 rounded-2xl md-surface p-4 shadow-2xl"
         >
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-white/40">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)]">
             Theme Color
           </p>
           <div className="flex items-center gap-3">
@@ -148,7 +148,7 @@ export default function ThemePicker({ color, onChange }: ThemePickerProps) {
                 setRainbow(false);
                 onChange(DEFAULT_COLOR);
               }}
-              className="text-xs text-white/40 hover:text-red-400"
+              className="text-xs text-[var(--md-on-surface-variant)] hover:text-red-400"
             >
               Reset
             </button>
@@ -156,7 +156,7 @@ export default function ThemePicker({ color, onChange }: ThemePickerProps) {
           <button
             type="button"
             onClick={rainbow ? stopRainbow : startRainbow}
-            className="mt-2 w-full rounded-lg px-2 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+            className="mt-2 w-full rounded-full px-2 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
             style={{
               background: "linear-gradient(to right, #ef4444, #f97316, #eab308, #22c55e, #3b82f6, #8b5cf6, #ef4444)",
               opacity: rainbow ? 1 : 0.5,

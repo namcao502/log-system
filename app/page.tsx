@@ -16,14 +16,20 @@ export default function Home() {
   const today = getFormattedDate();
   return (
     <>
-      <div className="fixed inset-0 -z-10 overflow-hidden bg-[#0d0d2b]">
-        <div className="aurora-blob aurora-blob-1" />
-        <div className="aurora-blob aurora-blob-2" />
-        <div className="aurora-blob aurora-blob-3" />
-        <div className="aurora-blob aurora-blob-4" />
-        <div className="aurora-blob aurora-blob-5" />
+      <div className="corner-wrap corner-wrap--tl" aria-hidden="true">
+        <div className="cs-1" /><div className="cs-2" /><div className="cs-3" />
       </div>
-      <main className="flex min-h-screen items-start justify-center px-4 pt-16">
+      <div className="corner-wrap corner-wrap--tr" aria-hidden="true">
+        <div className="cs-1" /><div className="cs-2" /><div className="cs-3" />
+      </div>
+      <div className="corner-wrap corner-wrap--bl" aria-hidden="true">
+        <div className="cs-1" /><div className="cs-2" /><div className="cs-3" />
+      </div>
+      <div className="corner-wrap corner-wrap--br" aria-hidden="true">
+        <div className="cs-1" /><div className="cs-2" /><div className="cs-3" />
+      </div>
+
+      <main className="relative z-10 flex min-h-screen items-start justify-center px-4 pt-16">
         <div className="w-full max-w-3xl">
           <AppShell today={today} />
         </div>

@@ -1,5 +1,26 @@
 # Changelog
 
+## [MATERIAL-YOU-REDESIGN] - 2026-04-22
+### Changed
+- Replaced glassmorphism (backdrop-blur, semi-transparent `glass` / `glass-strong` utilities) with Material You (MD3) solid tonal surface system
+- Removed aurora animated blob background (5 radial gradient blobs + all `aurora-blob-*` keyframe animations)
+- `globals.css` defines MD3 color tokens (`--md-primary`, `--md-primary-container`, `--md-surface-container-*`, `--md-outline-variant`, etc.) all derived from `--theme-hue` so ThemePicker and rainbow mode still drive the full palette dynamically
+- Surface utilities: `md-surface` (cards/popovers), `md-surface-high` (nested containers), `md-list-item` (tonal item rows)
+- Button utilities: `md-btn-filled` (Verify/Add — primary filled), `md-btn-tonal` (Log TSC/HRM — secondary tonal), `md-btn-accent` (Log All — elevated container); all pill-shaped (`border-radius: 9999px`)
+- Input utility: `md-input` (outlined text field with primary focus ring)
+- All `text-white/XX` opacity tokens replaced with MD3 semantic variables (`--md-on-surface`, `--md-on-surface-variant`)
+- Background lightness raised from 7% to 11%; surface containers step at 14/17/21/25% for tonal elevation
+- Toast `backdrop-blur-xl` removed; toasts use solid `--md-surface-container` background
+- Cards use `rounded-2xl`, nested containers `rounded-xl`, list items `rounded-xl`
+- DatePickerPopover day buttons changed to `rounded-full` (MD3 calendar style)
+### Added
+- 4-corner SVG polygon animations: 12 unique polygon outlines (3 per corner) that scale from nearly zero and fade over 6 s with 2 s stagger
+- Each corner has a distinct shape family: TL sharp/triangular, TR concave/notched, BL stepped/architectural, BR organic/asymmetric
+- TR/BL/BR corners mirror TL shapes via SVG group `transform="scale(-1,1|1,-1|-1,-1)"` so all shapes point inward
+- Shapes use hue offsets (+0, +28, +56 from `--theme-hue`) for a subtle tonal color drift across the three ripple rings
+- `overflow="visible"` set as SVG attribute (not CSS style) for correct cross-browser SVG clipping behavior
+- `transform-origin: 0 0` references the SVG viewport origin (= screen corner) without needing `transform-box`
+
 ## [AURORA-GLASSMORPHISM-UI] - 2026-04-21
 ### Changed
 - Applied aurora animated background (`aurora-blob-*`) with 5 radial gradient blobs that float via CSS keyframe animations

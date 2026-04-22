@@ -32,7 +32,7 @@ npx jest <file>      # Run a single test file
 app/
   page.tsx              # Server component — renders AppShell with Vietnamese date
   layout.tsx            # Root layout with Inter font
-  globals.css           # Tailwind directives, autofill override, scrollbar utility
+  globals.css           # Tailwind directives, MD3 color tokens, surface/button utilities, corner SVG animation CSS
   api/
     jira/
       verify/route.ts   # GET /api/jira/verify?ticket=MDP-xxxx — validates ticket exists
@@ -134,21 +134,50 @@ Two separate persistent sessions — each requires a manual login on first run:
 
 ### UI Theme
 
-Teal/emerald gradient palette throughout:
+Material You (MD3) dark scheme. All color tokens are derived from `--theme-hue` so `ThemePicker` and rainbow mode drive the entire palette without touching component code.
 
-| Element | Classes |
-|---------|---------|
-| Page background | `bg-gradient-to-br from-emerald-100 to-teal-100` |
-| Cards / popovers | `bg-gradient-to-br from-emerald-50 to-teal-50`, `border-emerald-200` |
-| Card section labels | `text-emerald-700` (uppercase, tracking-widest) |
-| Form labels | `text-emerald-800` |
-| White inputs / list items | `bg-white border-emerald-200`, focus `ring-emerald-500` |
-| Primary buttons (Verify, Add) | `bg-emerald-600 hover:bg-emerald-500` |
-| Log All button | `bg-emerald-800 hover:bg-emerald-700` |
-| Will-log summary block | `bg-emerald-50 border-l-emerald-500` |
-| Log panel (terminal) | `bg-[#022c22]`, prefix `text-emerald-400` |
-| Notifications: info | `text-teal-600` / `bg-teal-50` |
-| Error / success states | red / green — unchanged |
+**CSS custom properties (`globals.css`)**
+
+| Token | Role |
+|-------|------|
+| `--md-primary` | Accent color — filled buttons, focus rings, corner ripple stroke |
+| `--md-primary-container` | Log All button background |
+| `--md-on-primary-container` | Log All button text |
+| `--md-secondary-container` | Tonal button (Log TSC / Log HRM) background |
+| `--md-on-secondary-container` | Tonal button text |
+| `--md-background` / `--md-surface` | Page and base surface color (hue, 15%, 11%) |
+| `--md-surface-container` | Card / popover background |
+| `--md-surface-container-high` | Nested container background (status panels) |
+| `--md-surface-container-highest` | List item rows |
+| `--md-on-surface` | Primary text |
+| `--md-on-surface-variant` | Secondary text, section labels, icon buttons |
+| `--md-outline-variant` | Card borders, dividers |
+| `--md-outline` | Input borders |
+
+**CSS utility classes**
+
+| Class | Applied to |
+|-------|-----------|
+| `md-surface` | Cards, popover panels (`rounded-2xl`) |
+| `md-surface-high` | Nested status log containers (`rounded-xl`) |
+| `md-list-item` | Ticket and date list rows |
+| `md-input` | Text inputs and date picker trigger |
+| `md-btn-filled` | Verify, Add buttons (pill shape) |
+| `md-btn-tonal` | Log TSC, Log HRM buttons (pill shape) |
+| `md-btn-accent` | Log All button — elevated with shadow |
+
+**Corner decorations (`page.tsx`)**
+
+Four 1x1 px fixed SVG anchors at screen corners, each with 3 unique polygon outlines that scale from near-zero and fade over 6 s (2 s stagger). Shapes are outlined (fill: none), colored with hue offsets +0/+28/+56 from `--md-primary`. Each corner has a distinct shape family:
+
+| Corner | Family | Shapes |
+|--------|--------|--------|
+| TL | Sharp / triangular | right triangle, thin spike, skewed triangle |
+| TR | Concave / notched | boomerang, arrowhead notch, wide flat triangle |
+| BL | Stepped / architectural | L-shape, Z-step, double staircase |
+| BR | Organic / asymmetric | skewed quad, asymmetric pentagon, diamond |
+
+TR/BL/BR reuse the same shape definitions mirrored via SVG `transform="scale(-1,1)"` etc. so shapes always point inward from their corner.
 
 ### NDJSON Streaming
 

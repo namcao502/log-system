@@ -66,7 +66,7 @@ npm test         # Run all tests
 app/
   page.tsx                    # Server component - renders AppShell with formatted date
   layout.tsx                  # Root layout with Inter font
-  globals.css                 # Tailwind directives, CSS custom property theme system, aurora animations
+  globals.css                 # Tailwind directives, MD3 color tokens, surface/button utilities, corner SVG animation CSS
   api/
     jira/verify/route.ts      # GET  /api/jira/verify?ticket=MDP-xxxx
     sharepoint/log/route.ts   # POST /api/sharepoint/log
@@ -103,12 +103,13 @@ __tests__/
 
 ## Theme System
 
-The UI uses a CSS custom property theme (`--theme-hue`) for a fully dynamic color palette:
+The UI uses a Material You (MD3) dark scheme driven by a single CSS custom property `--theme-hue`:
 
-- `globals.css` defines `--t-50` through `--t-800` tokens derived from `--theme-hue`
-- `useTheme` hook reads/writes the hue via `localStorage` and sets the CSS variable on mount
-- `ThemePicker` provides a color picker popover with an optional **Rainbow** mode that animates the hue continuously via `requestAnimationFrame`
-- Aurora background blobs (`aurora-blob-*`) also respond to `--theme-hue`, keeping the background in sync with the chosen color
+- `globals.css` defines MD3 color tokens (`--md-primary`, `--md-surface-container-*`, `--md-outline-variant`, etc.) all as `hsl(var(--theme-hue), ...)` expressions, so changing `--theme-hue` repaints the entire UI
+- `useTheme` hook (`lib/useTheme.ts`) reads/writes the chosen hex color via `localStorage`, converts it to a hue via `hexToHue`, and sets `--theme-hue` on `document.documentElement`
+- `ThemePicker` component provides a color picker popover with a **Rainbow** mode that animates `--theme-hue` continuously via `requestAnimationFrame`
+- Surface elevation is expressed through lightness steps in the surface container tokens (no backdrop-filter or blur)
+- Four corner SVG polygon animations use stroke colors derived from `--theme-hue` with hue offsets (+0/+28/+56) so they stay in harmony with the chosen color
 
 ## Excel File Details
 
