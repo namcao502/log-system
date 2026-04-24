@@ -1,22 +1,31 @@
 import { render } from '@testing-library/react'
-import Home from '@/app/page'
+import BlobLayer from '@/components/BlobLayer'
 
-describe('Aurora Background', () => {
+describe('BlobLayer', () => {
   beforeEach(() => {
-    jest.spyOn(window, 'requestAnimationFrame').mockReturnValue(0 as unknown as ReturnType<typeof requestAnimationFrame>);
-    jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
-  });
+    jest.useFakeTimers()
+  })
 
   afterEach(() => {
-    jest.restoreAllMocks();
-  });
+    jest.useRealTimers()
+  })
 
-  test('renders all 5 aurora blob elements', () => {
-    const { container } = render(<Home />)
-    expect(container.querySelector('.aurora-blob-1')).toBeInTheDocument()
-    expect(container.querySelector('.aurora-blob-2')).toBeInTheDocument()
-    expect(container.querySelector('.aurora-blob-3')).toBeInTheDocument()
-    expect(container.querySelector('.aurora-blob-4')).toBeInTheDocument()
-    expect(container.querySelector('.aurora-blob-5')).toBeInTheDocument()
+  test('renders 50 aurora-blob elements inside an aria-hidden wrapper', () => {
+    const { container } = render(<BlobLayer />)
+    expect(container.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
+    expect(container.querySelectorAll('.aurora-blob')).toHaveLength(50)
+  })
+
+  test('each blob has inline width, height, background, and opacity', () => {
+    const { container } = render(<BlobLayer />)
+    const blobs = container.querySelectorAll('.aurora-blob')
+    blobs.forEach(blob => {
+      const el = blob as HTMLElement
+      expect(el.style.width).toBeTruthy()
+      expect(el.style.height).toBeTruthy()
+      // jsdom's CSSOM rejects hsl(calc(var(...))) -- check raw attribute string instead
+      expect(el.getAttribute('style')).toMatch(/background/)
+      expect(el.style.opacity).toBeTruthy()
+    })
   })
 })

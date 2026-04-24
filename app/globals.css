@@ -154,50 +154,12 @@ input:-webkit-autofill:focus {
   border-radius: 9999px;
 }
 
-/* Corner decorations — HTML divs with clip-path:path() bezier shapes */
-.corner-wrap {
+/* Aurora blobs -- corner-clustered drifting background */
+.aurora-blob {
   position: fixed;
-  width: 300px;
-  height: 300px;
+  top: 0;
+  left: 0;
   pointer-events: none;
   z-index: 0;
-}
-/* Each wrapper is centered on its screen corner (extends 150px in all directions) */
-.corner-wrap--tl { top: -150px; left: -150px; }
-.corner-wrap--tr { top: -150px; right: -150px; transform: scaleX(-1);    transform-origin: center; }
-.corner-wrap--bl { bottom: -150px; left: -150px; transform: scaleY(-1); transform-origin: center; }
-.corner-wrap--br { bottom: -150px; right: -150px; transform: scale(-1,-1); transform-origin: center; }
-
-/* Shapes fill the wrapper; transform-origin:center = the screen corner */
-.cs-1, .cs-2, .cs-3 {
-  position: absolute;
-  inset: 0;
-  transform-origin: center;
-}
-
-/* Rounded blob — fat teardrop curving right-down from center */
-.cs-1 {
-  background: hsl(var(--theme-hue), 55%, 62%);
-  clip-path: path("M 150,150 C 195,148 280,178 278,220 C 276,262 240,290 200,286 C 172,283 150,256 150,150 Z");
-  animation: corner-ripple 6s ease-out infinite;
-}
-
-/* Elongated spike — thin asymmetric teardrop curving down */
-.cs-2 {
-  background: hsl(calc(var(--theme-hue) + 28), 55%, 62%);
-  clip-path: path("M 150,150 C 165,154 185,178 178,235 C 172,282 158,296 150,296 C 140,276 138,218 150,150 Z");
-  animation: corner-ripple 6s ease-out infinite 2s;
-}
-
-/* Wide fan — broad sweep curving right with a curved return edge */
-.cs-3 {
-  background: hsl(calc(var(--theme-hue) + 56), 55%, 62%);
-  clip-path: path("M 150,150 C 200,148 290,154 293,196 C 296,234 268,260 228,260 C 190,260 162,278 150,262 C 138,240 140,195 150,150 Z");
-  animation: corner-ripple 6s ease-out infinite 4s;
-}
-
-@keyframes corner-ripple {
-  0%   { transform: scale(0.04); opacity: 0.5;  }
-  60%  {                         opacity: 0.18; }
-  100% { transform: scale(1);    opacity: 0;    }
+  will-change: transform, border-radius;
 }
