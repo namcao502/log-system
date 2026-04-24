@@ -10,7 +10,7 @@ describe("LogPanel", () => {
 
   it("renders a pre element when logs are present", () => {
     const { container } = render(
-      <LogPanel logs={["[browser-tsc] [0.1s] Browser launched"]} />
+      <LogPanel logs={["[tsc-log] [0.1s] Browser launched"]} />
     );
     expect(container.querySelector("pre")).toBeInTheDocument();
   });
@@ -19,8 +19,8 @@ describe("LogPanel", () => {
     render(
       <LogPanel
         logs={[
-          "[browser-tsc] [0.1s] Browser launched",
-          "[browser-tsc] [1.2s] Done",
+          "[tsc-log] [0.1s] Browser launched",
+          "[tsc-log] [1.2s] Done",
         ]}
       />
     );
@@ -30,7 +30,7 @@ describe("LogPanel", () => {
 
   it("does not render prefix span, shows timestamp and text", () => {
     const { container } = render(
-      <LogPanel logs={["[browser-tsc] [0.1s] some text"]} />
+      <LogPanel logs={["[tsc-log] [0.1s] some text"]} />
     );
     expect(container.querySelector("span.text-emerald-400")).not.toBeInTheDocument();
     expect(screen.getByText(/0\.1s/)).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe("LogPanel", () => {
 
   it("applies fixed height and overflow scroll classes", () => {
     const { container } = render(
-      <LogPanel logs={["[browser-tsc] test"]} />
+      <LogPanel logs={["[tsc-log] test"]} />
     );
     const pre = container.querySelector("pre");
     expect(pre?.className).toContain("h-[211px]");

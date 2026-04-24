@@ -42,7 +42,7 @@ app/
       log/route.ts      # POST /api/hrm/log — streams NDJSON; Playwright writes to HRM timesheet
 lib/
   types.ts              # Shared interfaces: JiraVerifyResponse, LogRequestBody, HrmLogRequestBody,
-                        #   LogStreamLine, HrmStreamLine, Notification, Toast (discriminated unions)
+                        #   LogStreamLine, HrmStreamLine, Notification, Toast (discriminated unions), LogRow
   constants.ts          # All UI plain-text strings: LABELS (display text) and NOTIFY (notification messages)
   jira.ts               # Jira REST API client (Basic auth, API token from env)
   browser-tsc.ts        # Playwright: opens Excel Online, navigates to cell, types ticket; accepts onLog callback
@@ -53,14 +53,16 @@ lib/
   useToasts.ts          # Hook: transient toast list state with addToast, dismissToast
 components/
   AppShell.tsx          # Client shell — wires useNotifications + useToasts, renders header + LogForm
-  LogForm.tsx           # Main client component — all state, log orchestration, readNdJsonStream helper
+  LogForm.tsx           # Main client component — rows: LogRow[] state, groupByDate, log orchestration, readNdJsonStream helper
+  LogRowItem.tsx        # Single log entry row — DatePickerPopover + ticket input + StatusBadge + remove button
   LogPanel.tsx          # Scrollable dark-terminal pre block for streaming log lines
-  DatePickerPopover.tsx # Calendar popover built on react-day-picker; hides a real <input type="date"> for test/a11y
+  DatePickerPopover.tsx # Calendar popover built on react-day-picker; hides a real <input type="date"> for test/a11y; min popover width 280px
   NotificationBell.tsx  # Bell icon with unread badge; dropdown list of past notifications
   Toast.tsx             # Single auto-dismissing toast item (4 s)
   ToastContainer.tsx    # Fixed top-right stack of active toasts
 __tests__/
   LogForm.test.tsx
+  LogRowItem.test.tsx
   LogPanel.test.tsx
   NotificationBell.test.tsx
   Toast.test.tsx
@@ -72,19 +74,20 @@ __tests__/
 
 ### Data Flow
 
-1. User types `MDP-xxxx` (comma-separated for multiple) and clicks **Verify**
-2. Frontend calls `/api/jira/verify` for each ticket in parallel
-3. Valid tickets are auto-staged (up to 5) in `stagedTickets`
-4. User selects one or more dates via `DatePickerPopover` + **Add** (up to 5 dates)
-5. User clicks one of three actions:
-   - **Log TSC** — `POST /api/sharepoint/log` with `{ ticket, dates }`
-   - **Log HRM** — `POST /api/hrm/log` with `{ tickets, dates }`
-   - **Log All** — both requests fired in parallel via `Promise.all`
-6. Each API route responds immediately with `Content-Type: application/x-ndjson` and streams progress
+1. User starts with one empty row (date = today, ticket = blank)
+2. User types a ticket number (e.g. `1234`) — auto-prefixed to `MDP-1234` on each keystroke
+3. On blur, `handleTicketBlur` calls `GET /api/jira/verify?ticket=MDP-1234`; row status becomes `valid` (green check) or `invalid` (red X)
+4. User clicks **+ Add row** to log more (date, ticket) pairs; each row is independent
+5. `groupByDate(rows)` groups all valid rows by date — same-date rows are combined into one API call
+6. User clicks one of three actions:
+   - **Log TSC** — iterates date groups, `POST /api/sharepoint/log` with `{ ticket: joined, dates: [date] }` per group
+   - **Log HRM** — iterates date groups, `POST /api/hrm/log` with `{ tickets, dates: [date] }` per group
+   - **Log All** — TSC and HRM iterations run in parallel via `Promise.all`
+7. Each API route responds with `Content-Type: application/x-ndjson` and streams progress
    - `{ type: "log", data: string }` lines are appended live to the log panel in the UI
    - A final `{ type: "result", success: bool, ... }` line signals completion
    - `readNdJsonStream()` in `LogForm.tsx` drives the consumer loop
-7. On success, `stagedTickets` is cleared; a toast notification and a bell notification are both fired
+8. On success, rows are reset to one empty row; a toast notification and a bell notification are fired
 
 ### Excel File Details
 
@@ -126,11 +129,12 @@ Two separate persistent sessions — each requires a manual login on first run:
 - API routes handle all external service calls — the frontend never calls Jira or HRM directly
 - Shared request/response types live in `lib/types.ts` — imported by both API routes and components
 - All UI plain-text strings live in `lib/constants.ts` (`LABELS` for display, `NOTIFY` for notifications) — never hardcode strings in components
-- Async operation state in `LogForm` uses three separate boolean flags: `isJiraLoading`, `isTscLogging`, `isHrmLogging`
-- `DatePickerPopover` wraps a hidden `<input type="date">` (for tests and screen readers) alongside a styled calendar popover
-- Ticket format: `MDP-\d+`, comma-separated for multi-ticket input; max 5 staged tickets
+- Async operation state in `LogForm` uses two boolean flags: `isTscLogging`, `isHrmLogging`
+- `LogForm` state is `rows: LogRow[]` — one entry per (date, ticket) pair; grouping by date happens at log time via `groupByDate()`
+- `LogRowItem` handles auto-prefix: bare digits become `MDP-{digits}`; Jira verification fires on blur
+- `DatePickerPopover` wraps a hidden `<input type="date">` (for tests and screen readers) alongside a styled calendar popover; popover min-width is `Math.max(triggerWidth, 280)`
+- Ticket format: `MDP-\d+`; auto-prefixed in `LogRowItem.handleTicketChange`
 - Dates are stored as `YYYY-MM-DD` strings; formatted for display with `Intl.DateTimeFormat`
-- Max 5 staged dates; both tickets and dates show a **Clear All** button when non-empty
 
 ### UI Theme
 
@@ -184,8 +188,8 @@ TR/BL/BR reuse the same shape definitions mirrored via SVG `transform="scale(-1,
 Both logging API routes stream progress as newline-delimited JSON (`application/x-ndjson`):
 
 ```
-{ "type": "log",    "data": "[browser-tsc] Browser launched" }
-{ "type": "log",    "data": "[browser-tsc] Navigated to M366" }
+{ "type": "log",    "data": "[tsc-log] Browser launched" }
+{ "type": "log",    "data": "[tsc-log] Navigated to M366" }
 { "type": "result", "success": true, "cell": "M366" }
 ```
 

@@ -46,3 +46,11 @@ export interface Notification {
 }
 
 export type Toast = Omit<Notification, "timestamp">;
+
+export interface LogRow {
+  id: string;
+  date: string;         // YYYY-MM-DD
+  ticket: string;       // "MDP-1234" or "" while typing
+  status: "idle" | "verifying" | "valid" | "invalid";
+  summary?: string;     // from Jira verify
+}

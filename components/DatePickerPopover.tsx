@@ -56,17 +56,31 @@ export default function DatePickerPopover({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Compute fixed position from trigger rect each time the popover opens.
+  // Compute fixed position from trigger rect; re-run on scroll/resize so the
+  // popover tracks the trigger button as the page scrolls.
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const calHeight = 320;
-    if (spaceBelow >= calHeight || rect.top < calHeight) {
-      setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-    } else {
-      setPos({ bottom: window.innerHeight - rect.top + 4, left: rect.left, width: rect.width });
-    }
+
+    const update = () => {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const calHeight = 320;
+      if (spaceBelow >= calHeight || rect.top < calHeight) {
+        setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+      } else {
+        setPos({ bottom: window.innerHeight - rect.top + 4, left: rect.left, width: rect.width });
+      }
+    };
+
+    update();
+    // capture:true catches scroll on any ancestor, not just window
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
   }, [open]);
 
   // Close on outside click (checking both trigger and portaled popover).
@@ -101,7 +115,7 @@ export default function DatePickerPopover({
     ? {
         position: "fixed",
         left: pos.left,
-        width: pos.width,
+        minWidth: Math.max(pos.width, 280),
         ...(pos.top !== undefined ? { top: pos.top } : { bottom: pos.bottom }),
         zIndex: 9999,
       }

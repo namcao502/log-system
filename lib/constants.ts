@@ -2,34 +2,26 @@
 
 export const LABELS = {
   // Section headings
-  TICKETS: "Tickets",
-  DATES: "Dates",
   STATUS: "Status",
   ACTIONS: "Actions",
   TSC_LOG: "TSC Log",
   HRM_LOG: "HRM Log",
 
-  // Field labels
-  TICKET: "Ticket:",
-  DATE: "Date:",
-
   // Buttons
-  CLEAR_ALL: "Clear All",
-  ADD: "Add",
-  VERIFY: "Verify",
-  VERIFYING: "Verifying...",
   LOG_TSC: "Log TSC",
+  LOG_HRM: "Log HRM",
   WILL_LOG: "Will log:",
-  ON: "on",
-
-  // Input
-  TICKET_PLACEHOLDER: "MDP-1234 or MDP-1234, MDP-5678",
-  TICKET_FORMAT_ERROR: "Use MDP-xxxx format",
-  NO_SUMMARY: "No summary",
 
   // DatePickerPopover
   PICK_A_DATE: "Pick a date",
   DATE_PICKER_ARIA: "Date picker",
+
+  // LogRowItem
+  LOG_ENTRIES: "Log Entries",
+  ADD_ROW: "Add row",
+  TICKET_ROW_PLACEHOLDER: "1234",
+  DATE_COL: "Date",
+  TICKET_COL: "Ticket",
 } as const;
 
 export const NOTIFY = {

@@ -1,5 +1,24 @@
 # Changelog
 
+## [ROW-PER-PAIR-ENTRY] - 2026-04-24
+### Changed
+- Replaced two-panel (Tickets + Dates) UI with a row-per-pair entry table: each row is an independent (date, ticket) pair
+- Ticket field auto-prefixes "MDP-" as you type bare digits; Jira verification fires on blur per row (no explicit Verify button)
+- Rows are grouped by date before logging -- same-date rows are combined into one API call per destination
+- TSC and HRM handlers iterate date groups sequentially; Log All still runs TSC and HRM in parallel
+- `LogForm` state replaced: `stagedTickets + logDates + isJiraLoading` removed, replaced with `rows: LogRow[]`
+- Removing the last row replaces it with a fresh empty row so the table is never blank
+- Skip re-verification guard: blur on an already-verified unchanged ticket does not trigger a second Jira call
+### Added
+- `LogRowItem` component -- single editable row with `DatePickerPopover`, ticket input, `StatusBadge` (verified/invalid/verifying/idle), remove button, and summary line below
+- `LogRow` interface in `lib/types.ts`: `{ id, date, ticket, status, summary? }`
+- `LABELS.LOG_ENTRIES`, `ADD_ROW`, `TICKET_ROW_PLACEHOLDER`, `DATE_COL`, `TICKET_COL`, `LOG_HRM` constants
+- `jest.environment.ts` -- custom Jest environment extending jsdom with Node 22 fetch globals for test suite
+### Fixed
+- `DatePickerPopover` popover minimum width raised to `Math.max(triggerWidth, 280)` so the calendar renders correctly inside narrow grid columns
+### Removed
+- `LABELS.TICKETS`, `DATES`, `CLEAR_ALL`, `ADD`, `VERIFY`, `VERIFYING`, `TICKET_PLACEHOLDER`, `TICKET_FORMAT_ERROR`, `NO_SUMMARY`, `TICKET`, `DATE`, `ON` -- all unused after rewrite
+
 ## [MATERIAL-YOU-REDESIGN] - 2026-04-22
 ### Changed
 - Replaced glassmorphism (backdrop-blur, semi-transparent `glass` / `glass-strong` utilities) with Material You (MD3) solid tonal surface system
@@ -54,7 +73,7 @@
 ## [RENAME-BROWSER-TSC] - 2026-04-13
 ### Changed
 - Renamed `lib/browser-log.ts` to `lib/browser-tsc.ts` for consistency with `browser-hrm.ts`
-- Log prefix changed from `[browser-log]` to `[browser-tsc]` in all stream output
+- Log prefix changed from `[browser-log]` to `[tsc-log]` in all stream output
 - Added date validation in `app/api/sharepoint/log/route.ts` and `app/api/hrm/log/route.ts`
 
 ## [TEAL-RETHEME-NOTIFICATIONS] - 2026-04-03

@@ -1,29 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import type { JiraVerifyResponse, Notification } from "@/lib/types";
+import { useState, useCallback, useId } from "react";
+import type { JiraVerifyResponse, LogRow, Notification } from "@/lib/types";
 import { getTimeSlots } from "@/lib/time-slots";
 import { LABELS, NOTIFY } from "@/lib/constants";
 import LogPanel from "./LogPanel";
-import DatePickerPopover from "./DatePickerPopover";
-
-interface HrmTicketItem {
-  ticket: string;
-  summary: string;
-}
+import LogRowItem from "./LogRowItem";
 
 interface LogFormProps {
   onNotify: (n: Omit<Notification, "id" | "timestamp">) => void;
 }
 
-const SINGLE_TICKET_REGEX = /^MDP-\d+$/;
-const INPUT_REGEX = /^MDP-\d+(,\s*MDP-\d+)*$/;
-const MAX_HRM_TICKETS = 5;
-const MAX_LOG_DATES = 5;
-
-function parseTickets(input: string): string[] {
-  return input.split(/,\s*/).filter((t) => SINGLE_TICKET_REGEX.test(t));
-}
+const DIGIT_SEGMENT_REGEX = /^\d+$/;
 
 function getTodayDateString(): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -32,9 +20,9 @@ function getTodayDateString(): string {
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(new Date());
-  const year = parts.find((p) => p.type === "year")!.value;
+  const year  = parts.find((p) => p.type === "year")!.value;
   const month = parts.find((p) => p.type === "month")!.value;
-  const day = parts.find((p) => p.type === "day")!.value;
+  const day   = parts.find((p) => p.type === "day")!.value;
   return `${year}-${month}-${day}`;
 }
 
@@ -56,14 +44,42 @@ function getCurrentYearBounds(): { min: string; max: string } {
   return { min: `${yearStr}-01-01`, max: `${yearStr}-12-31` };
 }
 
+function nextDay(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const next = new Date(y, m - 1, d + 1);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+}
+
+function newRow(date: string): LogRow {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    date,
+    ticket: "",
+    status: "idle",
+  };
+}
+
+function prefixTickets(raw: string): string[] {
+  return raw.split(/,\s*/).map((s) => s.trim()).filter(Boolean).map((s) => `MDP-${s}`);
+}
+
+function groupByDate(rows: LogRow[]): [string, string[]][] {
+  const map = new Map<string, string[]>();
+  for (const row of rows) {
+    if (row.status !== "valid") continue;
+    const tickets = prefixTickets(row.ticket);
+    map.set(row.date, [...(map.get(row.date) ?? []), ...tickets]);
+  }
+  return [...map.entries()];
+}
+
 async function readNdJsonStream(
   body: ReadableStream<Uint8Array>,
-  onLog: (line: string) => void
+  onLog: (line: string) => void,
 ): Promise<{ success: boolean; cell?: string; error?: string }> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -73,453 +89,346 @@ async function readNdJsonStream(
     for (const line of lines) {
       if (!line.trim()) continue;
       const msg = JSON.parse(line) as {
-        type: string;
-        data?: string;
-        success?: boolean;
-        cell?: string;
-        error?: string;
+        type: string; data?: string; success?: boolean; cell?: string; error?: string;
       };
-      if (msg.type === "log" && msg.data !== undefined) {
-        onLog(msg.data);
-      } else if (msg.type === "result") {
-        return { success: msg.success ?? false, cell: msg.cell, error: msg.error };
-      }
+      if (msg.type === "log" && msg.data !== undefined) onLog(msg.data);
+      else if (msg.type === "result") return { success: msg.success ?? false, cell: msg.cell, error: msg.error };
     }
   }
   return { success: false, error: NOTIFY.ERR_STREAM };
 }
 
 export default function LogForm({ onNotify }: LogFormProps) {
-  const [ticket, setTicket] = useState("");
-  const [stagingDate, setStagingDate] = useState(getTodayDateString);
-  const [logDates, setLogDates] = useState<string[]>(() => [getTodayDateString()]);
-  const [isJiraLoading, setIsJiraLoading] = useState(false);
+  const today = getTodayDateString();
+  const initialId = useId();
+  const [rows, setRows] = useState<LogRow[]>(() => [{ id: initialId, date: today, ticket: "", status: "idle" }]);
   const [isTscLogging, setIsTscLogging] = useState(false);
   const [isHrmLogging, setIsHrmLogging] = useState(false);
-  const [stagedTickets, setStagedTickets] = useState<HrmTicketItem[]>([]);
-  const [exitingTickets, setExitingTickets] = useState<Set<string>>(new Set());
   const [tscLogs, setTscLogs] = useState<string[]>([]);
   const [hrmLogs, setHrmLogs] = useState<string[]>([]);
 
-  const isLogging = isTscLogging || isHrmLogging;
-  const isTicketValid = INPUT_REGEX.test(ticket.trim());
   const { min, max } = getCurrentYearBounds();
+  const isLogging = isTscLogging || isHrmLogging;
+  const groups = groupByDate(rows);
+  const validCount = groups.reduce((n, [, t]) => n + t.length, 0);
 
-  const handleTicketChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setTicket(e.target.value.toUpperCase());
-    },
-    []
-  );
+  // --- Row handlers ---
 
-  const handleStagingDateChange = useCallback((value: string) => {
-    setStagingDate(value);
+  const handleAddRow = useCallback(() => {
+    setRows((prev) => {
+      const used = new Set(prev.map((r) => r.date));
+      let candidate = getTodayDateString();
+      while (used.has(candidate)) candidate = nextDay(candidate);
+      return [...prev, newRow(candidate)];
+    });
   }, []);
 
-  const handleAddDate = useCallback(() => {
-    if (!stagingDate || logDates.includes(stagingDate) || logDates.length >= MAX_LOG_DATES) return;
-    setLogDates((prev) => [...prev, stagingDate]);
-  }, [stagingDate, logDates]);
-
-  const handleRemoveDate = useCallback((date: string) => {
-    setLogDates((prev) => prev.filter((d) => d !== date));
+  const handleDateChange = useCallback((id: string, date: string) => {
+    setRows((prev) => {
+      if (prev.some((r) => r.id !== id && r.date === date)) return prev;
+      return prev.map((r) => r.id === id ? { ...r, date } : r);
+    });
   }, []);
 
-  const handleVerify = useCallback(async () => {
-    if (!isTicketValid || isJiraLoading) return;
-    setIsJiraLoading(true);
-    const tickets = parseTickets(ticket);
+  const handleTicketChange = useCallback((id: string, ticket: string) => {
+    setRows((prev) =>
+      prev.map((r) => r.id === id ? { ...r, ticket, status: "idle", summary: undefined } : r),
+    );
+  }, []);
+
+  const handleTicketBlur = useCallback(async (id: string, raw: string) => {
+    const parts = raw.split(/,\s*/).map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) return;
+
+    // All parts must be digit strings
+    if (!parts.every((s) => DIGIT_SEGMENT_REGEX.test(s))) {
+      setRows((prev) => prev.map((r) => r.id === id ? { ...r, status: "invalid" } : r));
+      return;
+    }
+
+    const normalized = parts.join(", ");
+    const existing = rows.find((r) => r.id === id);
+    if (existing?.status === "valid" && existing.ticket === normalized) return;
+
+    setRows((prev) => prev.map((r) =>
+      r.id === id ? { ...r, ticket: normalized, status: "verifying" } : r
+    ));
     try {
       const results = await Promise.all(
-        tickets.map(async (t) => {
-          const res = await fetch(`/api/jira/verify?ticket=${encodeURIComponent(t)}`);
+        parts.map(async (s) => {
+          const ticket = `MDP-${s}`;
+          const res = await fetch(`/api/jira/verify?ticket=${encodeURIComponent(ticket)}`);
           const data: JiraVerifyResponse = await res.json();
-          return { ticket: t, data };
-        })
+          return { ticket, data };
+        }),
+      );
+      const allValid = results.every((r) => r.data.valid);
+      const summary = results.map((r) => `${r.ticket}: ${r.data.summary ?? ""}`).join("\n");
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? { ...r, status: allValid ? "valid" : "invalid", summary: allValid ? summary : undefined }
+            : r,
+        ),
       );
       const invalid = results.filter((r) => !r.data.valid);
       if (invalid.length > 0) {
-        onNotify({
-          type: "error",
-          title: NOTIFY.JIRA_FAILED,
-          detail: `Invalid: ${invalid.map((r) => r.ticket).join(", ")}`,
-        });
-        return;
+        onNotify({ type: "error", title: NOTIFY.JIRA_FAILED, detail: `Invalid: ${invalid.map((r) => r.ticket).join(", ")}` });
       }
-      const verified: HrmTicketItem[] = results.map((r) => ({
-        ticket: r.ticket,
-        summary: `${r.ticket} — ${r.data.summary ?? LABELS.NO_SUMMARY}`,
-      }));
-      onNotify({
-        type: "info",
-        title: NOTIFY.JIRA_VERIFIED,
-        detail: verified.map((v) => v.summary).join(", "),
-      });
-      setStagedTickets((prev) => {
-        const existingIds = new Set(prev.map((t) => t.ticket));
-        const toAdd = verified.filter((v) => !existingIds.has(v.ticket));
-        const combined = [...prev, ...toAdd];
-        return combined.slice(0, MAX_HRM_TICKETS);
-      });
-      document.getElementById("log-date")?.focus();
     } catch {
+      setRows((prev) => prev.map((r) => r.id === id ? { ...r, status: "invalid" } : r));
       onNotify({ type: "error", title: NOTIFY.JIRA_FAILED, detail: NOTIFY.ERR_JIRA_API });
-    } finally {
-      setIsJiraLoading(false);
     }
-  }, [ticket, isTicketValid, isJiraLoading, onNotify]);
+  }, [onNotify, rows]);
 
-  const handleRemoveFromStaged = useCallback((ticketId: string) => {
-    setExitingTickets((prev) => new Set([...prev, ticketId]));
-    setTimeout(() => {
-      setStagedTickets((prev) => prev.filter((t) => t.ticket !== ticketId));
-      setExitingTickets((prev) => {
-        const next = new Set(prev);
-        next.delete(ticketId);
-        return next;
-      });
-    }, 150);
+  const handleRemoveRow = useCallback((id: string) => {
+    setRows((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      return next.length > 0 ? next : [newRow(getTodayDateString())];
+    });
   }, []);
 
+  // --- Log handlers ---
+
   const handleLogTsc = useCallback(async () => {
-    if (stagedTickets.length === 0 || isLogging) return;
-    const tscTicket = stagedTickets.map((t) => t.ticket).join(", ");
-    const tscSummary = stagedTickets.map((t) => t.summary).join(", ");
+    if (groups.length === 0 || isLogging) return;
     setIsTscLogging(true);
     setTscLogs([]);
     try {
-      const res = await fetch("/api/sharepoint/log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket: tscTicket, dates: logDates }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { error?: string };
-        onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: data.error ?? NOTIFY.ERR_LOG });
-        return;
-      }
-      if (!res.body) {
-        onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: NOTIFY.ERR_LOG });
-        return;
-      }
-      const result = await readNdJsonStream(res.body, (line) =>
-        setTscLogs((prev) => [...prev, line])
-      );
-      if (result.success) {
-        onNotify({
-          type: "success",
-          title: NOTIFY.TSC_LOGGED,
-          detail: `${tscSummary} → cell ${result.cell ?? "?"}`,
+      for (const [date, tickets] of groups) {
+        const res = await fetch("/api/sharepoint/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticket: tickets.join(", "), dates: [date] }),
         });
-        setStagedTickets([]);
-      } else {
-        onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: result.error || NOTIFY.ERR_LOG });
+        if (!res.ok || !res.body) {
+          const data = await res.json().catch(() => ({})) as { error?: string };
+          onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: data.error ?? NOTIFY.ERR_LOG });
+          return;
+        }
+        const result = await readNdJsonStream(res.body, (line) =>
+          setTscLogs((prev) => [...prev, line]),
+        );
+        if (!result.success) {
+          onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: result.error || NOTIFY.ERR_LOG });
+          return;
+        }
       }
+      onNotify({
+        type: "success",
+        title: NOTIFY.TSC_LOGGED,
+        detail: groups.map(([d, t]) => `${t.join(", ")} on ${formatDateDisplay(d)}`).join("; "),
+      });
+      setRows([newRow(getTodayDateString())]);
     } catch {
       onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: NOTIFY.ERR_EXCEL });
     } finally {
       setIsTscLogging(false);
     }
-  }, [stagedTickets, logDates, isLogging, onNotify]);
+  }, [groups, isLogging, onNotify]);
 
   const handleLogHrm = useCallback(async () => {
-    if (stagedTickets.length === 0 || isLogging) return;
+    if (groups.length === 0 || isLogging) return;
     setIsHrmLogging(true);
     setHrmLogs([]);
     try {
-      const res = await fetch("/api/hrm/log", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tickets: stagedTickets.map((t) => t.ticket),
-          dates: logDates,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { error?: string };
-        onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: data.error ?? NOTIFY.ERR_HRM });
-        return;
-      }
-      if (!res.body) {
-        onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: NOTIFY.ERR_HRM });
-        return;
-      }
-      const result = await readNdJsonStream(res.body, (line) =>
-        setHrmLogs((prev) => [...prev, line])
-      );
-      if (result.success) {
-        const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
-        onNotify({
-          type: "success",
-          title: NOTIFY.HRM_LOGGED,
-          detail: `${ticketIds} on ${logDates.map(formatDateDisplay).join(", ")}`,
+      for (const [date, tickets] of groups) {
+        const res = await fetch("/api/hrm/log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tickets, dates: [date] }),
         });
-        setStagedTickets([]);
-      } else {
-        onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: result.error || NOTIFY.ERR_HRM });
+        if (!res.ok || !res.body) {
+          const data = await res.json().catch(() => ({})) as { error?: string };
+          onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: data.error ?? NOTIFY.ERR_HRM });
+          return;
+        }
+        const result = await readNdJsonStream(res.body, (line) =>
+          setHrmLogs((prev) => [...prev, line]),
+        );
+        if (!result.success) {
+          onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: result.error || NOTIFY.ERR_HRM });
+          return;
+        }
       }
+      onNotify({
+        type: "success",
+        title: NOTIFY.HRM_LOGGED,
+        detail: groups.map(([d, t]) => `${t.join(", ")} on ${formatDateDisplay(d)}`).join("; "),
+      });
+      setRows([newRow(getTodayDateString())]);
     } catch {
       onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: NOTIFY.ERR_HRM_API });
     } finally {
       setIsHrmLogging(false);
     }
-  }, [stagedTickets, logDates, isLogging, onNotify]);
+  }, [groups, isLogging, onNotify]);
 
   const handleLogAll = useCallback(async () => {
-    if (stagedTickets.length === 0 || isLogging) return;
-    const tscTicket = stagedTickets.map((t) => t.ticket).join(", ");
-    const tscSummary = stagedTickets.map((t) => t.summary).join(", ");
+    if (groups.length === 0 || isLogging) return;
     setIsTscLogging(true);
     setIsHrmLogging(true);
     setTscLogs([]);
     setHrmLogs([]);
 
-    await Promise.all([
-      (async () => {
-        try {
+    const tscTask = (async () => {
+      try {
+        for (const [date, tickets] of groups) {
           const res = await fetch("/api/sharepoint/log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ticket: tscTicket, dates: logDates }),
+            body: JSON.stringify({ ticket: tickets.join(", "), dates: [date] }),
           });
-          if (!res.ok) {
+          if (!res.ok || !res.body) {
             const data = await res.json().catch(() => ({})) as { error?: string };
             onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: data.error ?? NOTIFY.ERR_LOG });
-            return;
-          }
-          if (!res.body) {
-            onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: NOTIFY.ERR_LOG });
-            return;
+            return false;
           }
           const result = await readNdJsonStream(res.body, (line) =>
-            setTscLogs((prev) => [...prev, line])
+            setTscLogs((prev) => [...prev, line]),
           );
-          if (result.success) {
-            onNotify({
-              type: "success",
-              title: NOTIFY.TSC_LOGGED,
-              detail: `${tscSummary} → cell ${result.cell ?? "?"}`,
-            });
-            setStagedTickets([]);
-          } else {
+          if (!result.success) {
             onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: result.error || NOTIFY.ERR_LOG });
+            return false;
           }
-        } catch {
-          onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: NOTIFY.ERR_EXCEL });
-        } finally {
-          setIsTscLogging(false);
         }
-      })(),
-      (async () => {
-        try {
+        onNotify({
+          type: "success",
+          title: NOTIFY.TSC_LOGGED,
+          detail: groups.map(([d, t]) => `${t.join(", ")} on ${formatDateDisplay(d)}`).join("; "),
+        });
+        return true;
+      } catch {
+        onNotify({ type: "error", title: NOTIFY.TSC_FAILED, detail: NOTIFY.ERR_EXCEL });
+        return false;
+      } finally {
+        setIsTscLogging(false);
+      }
+    })();
+
+    const hrmTask = (async () => {
+      try {
+        for (const [date, tickets] of groups) {
           const res = await fetch("/api/hrm/log", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tickets: stagedTickets.map((t) => t.ticket), dates: logDates }),
+            body: JSON.stringify({ tickets, dates: [date] }),
           });
-          if (!res.ok) {
+          if (!res.ok || !res.body) {
             const data = await res.json().catch(() => ({})) as { error?: string };
             onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: data.error ?? NOTIFY.ERR_HRM });
-            return;
-          }
-          if (!res.body) {
-            onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: NOTIFY.ERR_HRM });
-            return;
+            return false;
           }
           const result = await readNdJsonStream(res.body, (line) =>
-            setHrmLogs((prev) => [...prev, line])
+            setHrmLogs((prev) => [...prev, line]),
           );
-          if (result.success) {
-            const ticketIds = stagedTickets.map((t) => t.ticket).join(", ");
-            onNotify({
-              type: "success",
-              title: NOTIFY.HRM_LOGGED,
-              detail: `${ticketIds} on ${logDates.map(formatDateDisplay).join(", ")}`,
-            });
-            setStagedTickets([]);
-          } else {
+          if (!result.success) {
             onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: result.error || NOTIFY.ERR_HRM });
+            return false;
           }
-        } catch {
-          onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: NOTIFY.ERR_HRM_API });
-        } finally {
-          setIsHrmLogging(false);
         }
-      })(),
-    ]);
-  }, [logDates, stagedTickets, isLogging, onNotify]);
+        onNotify({
+          type: "success",
+          title: NOTIFY.HRM_LOGGED,
+          detail: groups.map(([d, t]) => `${t.join(", ")} on ${formatDateDisplay(d)}`).join("; "),
+        });
+        return true;
+      } catch {
+        onNotify({ type: "error", title: NOTIFY.HRM_FAILED, detail: NOTIFY.ERR_HRM_API });
+        return false;
+      } finally {
+        setIsHrmLogging(false);
+      }
+    })();
 
-  const logAllLabel = `Log All — ${stagedTickets.length} ticket${stagedTickets.length !== 1 ? "s" : ""} x ${logDates.length} date${logDates.length !== 1 ? "s" : ""}`;
-  const showFormatError = ticket.length > 0 && !isTicketValid;
+    const [tscOk, hrmOk] = await Promise.all([tscTask, hrmTask]);
+    if (tscOk && hrmOk) {
+      setRows([newRow(getTodayDateString())]);
+    }
+  }, [groups, isLogging, onNotify]);
+
+  // --- Render ---
+
+  const logAllLabel = `Log All -- ${validCount} ticket${validCount !== 1 ? "s" : ""} across ${groups.length} date${groups.length !== 1 ? "s" : ""}`;
 
   return (
     <div className="space-y-2.5">
-      <div className="grid grid-cols-2 gap-2.5">
-        {/* Tickets card */}
-        <div className="rounded-2xl md-surface px-5 py-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)]">
-              {stagedTickets.length > 0 ? `${LABELS.TICKETS} (${stagedTickets.length}/5)` : LABELS.TICKETS}
-            </p>
-            {stagedTickets.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setStagedTickets([])}
-                className="text-xs text-[var(--md-on-surface-variant)] hover:text-red-400"
-              >
-                {LABELS.CLEAR_ALL}
-              </button>
-            )}
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="ticket" className="text-sm font-medium text-[var(--md-on-surface)]">
-              {LABELS.TICKET}
-            </label>
-            <input
-              id="ticket"
-              type="text"
-              autoComplete="off"
-              placeholder={LABELS.TICKET_PLACEHOLDER}
-              value={ticket}
-              onChange={handleTicketChange}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && isTicketValid && !isJiraLoading) {
-                  handleVerify();
-                }
-              }}
-              className={`w-full px-3 py-2 text-sm md-input ${
-                showFormatError ? "!border-red-500" : ""
-              }`}
-            />
-            <button
-              type="button"
-              disabled={!isTicketValid || isJiraLoading}
-              onClick={handleVerify}
-              className="w-full px-4 py-2 text-sm md-btn-filled
-                         active:scale-95 transition-transform duration-100
-                         disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isJiraLoading ? LABELS.VERIFYING : LABELS.VERIFY}
-            </button>
-          </div>
-          {showFormatError && (
-            <p className="text-xs text-red-400">{LABELS.TICKET_FORMAT_ERROR}</p>
-          )}
-          {stagedTickets.length > 0 && (
-            <ul className="space-y-1.5">
-              {stagedTickets.map((item) => {
-                const description = item.summary.slice(item.ticket.length + 3);
-                return (
-                  <li
-                    key={item.ticket}
-                    className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm transition-all duration-150 md-list-item ${
-                      exitingTickets.has(item.ticket) ? "opacity-0 -translate-y-1.5" : "animate-slide-in"
-                    }`}
-                  >
-                    <span className="flex flex-col min-w-0">
-                      <span className="font-medium text-[var(--md-on-surface)]">{item.ticket}</span>
-                      {description && (
-                        <span className="truncate text-xs text-[var(--md-on-surface-variant)]">{description}</span>
-                      )}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFromStaged(item.ticket)}
-                      className="ml-3 shrink-0 rounded p-1 text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-highest)] hover:text-red-400"
-                      aria-label={`Remove ${item.ticket}`}
-                    >
-                      &#x2715;
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+      {/* Entry table card */}
+      <div className="rounded-2xl md-surface px-5 py-4 space-y-3">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)]">
+          {LABELS.LOG_ENTRIES}
+        </p>
+        <div className="grid grid-cols-[230px_1fr_28px] gap-2 px-3 pb-1">
+          <span className="text-[11px] font-semibold text-[var(--md-on-surface-variant)] uppercase tracking-wide">{LABELS.DATE_COL}</span>
+          <span className="text-[11px] font-semibold text-[var(--md-on-surface-variant)] uppercase tracking-wide">{LABELS.TICKET_COL}</span>
+          <span />
         </div>
-
-        {/* Dates card */}
-        <div className="rounded-2xl md-surface px-5 py-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)]">
-              {logDates.length > 0 ? `${LABELS.DATES} (${logDates.length}/${MAX_LOG_DATES})` : LABELS.DATES}
-            </p>
-            {logDates.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setLogDates([])}
-                className="text-xs text-[var(--md-on-surface-variant)] hover:text-red-400"
-              >
-                {LABELS.CLEAR_ALL}
-              </button>
-            )}
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="log-date" className="text-sm font-medium text-[var(--md-on-surface)]">
-              {LABELS.DATE}
-            </label>
-            <DatePickerPopover
-              id="log-date"
-              value={stagingDate}
-              onChange={handleStagingDateChange}
+        <div className="flex flex-col gap-1.5">
+          {rows.map((row) => (
+            <LogRowItem
+              key={row.id}
+              row={row}
               min={min}
               max={max}
+              onDateChange={handleDateChange}
+              onTicketChange={handleTicketChange}
+              onTicketBlur={handleTicketBlur}
+              onRemove={handleRemoveRow}
             />
-            <button
-              type="button"
-              disabled={!stagingDate || logDates.includes(stagingDate) || logDates.length >= MAX_LOG_DATES}
-              onClick={handleAddDate}
-              className="w-full px-4 py-2 text-sm md-btn-filled
-                         active:scale-95 transition-transform duration-100
-                         disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {LABELS.ADD}
-            </button>
-          </div>
-          {logDates.length > 0 && (
-            <ul className="space-y-1.5">
-              {logDates.map((d) => (
-                <li
-                  key={d}
-                  className="flex items-center justify-between rounded-xl px-3 py-2 text-sm md-list-item"
-                >
-                  <span className="flex flex-col min-w-0">
-                    <span className="font-medium text-[var(--md-on-surface)]">
-                      {new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(
-                        (() => { const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day); })()
-                      )}
-                    </span>
-                    <span className="truncate text-xs text-[var(--md-on-surface-variant)]">
-                      {new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(
-                        (() => { const [y, m, day] = d.split("-").map(Number); return new Date(y, m - 1, day); })()
-                      )}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveDate(d)}
-                    className="ml-2 shrink-0 rounded p-1 text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-highest)] hover:text-red-400"
-                    aria-label={`Remove date ${d}`}
-                  >
-                    &#x2715;
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          ))}
         </div>
+        <button
+          type="button"
+          onClick={handleAddRow}
+          className="w-full flex items-center justify-center gap-1.5 py-2 text-sm
+                     border border-dashed border-[var(--md-outline-variant)]
+                     rounded-xl text-[var(--md-on-surface-variant)]
+                     hover:border-[var(--md-primary)] hover:text-[var(--md-primary)]
+                     transition-colors duration-150"
+        >
+          <span className="text-base leading-none">+</span> {LABELS.ADD_ROW}
+        </button>
       </div>
+
+      {/* Will-log summary */}
+      {groups.length > 0 && (
+        <div
+          data-testid="will-log-summary"
+          className="rounded-2xl md-surface px-5 py-4 space-y-3"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)]">{LABELS.WILL_LOG}</p>
+          <div className="rounded-xl border border-[var(--md-outline-variant)] border-l-4 border-l-[var(--md-primary)] bg-[var(--md-surface-container-high)] px-4 py-3 text-sm space-y-3">
+            {groups.map(([date, tickets], gi) => (
+              <div key={date}>
+                {gi > 0 && <div className="border-t border-[var(--md-outline-variant)] mb-3" />}
+                <p className="font-semibold text-[var(--md-on-surface)]">{formatDateDisplay(date)}</p>
+                <ul className="mt-1.5 space-y-1 pl-2">
+                  {tickets.map((t, i) => {
+                    const slots = getTimeSlots(tickets.length, i);
+                    return (
+                      <li key={t} className="flex items-center gap-2">
+                        <span className="font-medium text-[var(--md-on-surface)]">{t}</span>
+                        <span className="text-xs text-[var(--md-on-surface-variant)]">
+                          {slots.map((s) => `${s.start}--${s.end}`).join(" / ")}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Status card */}
       <div className="rounded-2xl md-surface px-5 py-4 space-y-3">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)]">{LABELS.STATUS}</p>
         <div className="grid grid-cols-2 gap-2.5">
-          {/* TSC Log block */}
           <div className="rounded-xl md-surface-high px-4 py-3 space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)]">{LABELS.TSC_LOG}</p>
             <LogPanel logs={tscLogs} />
           </div>
-
-          {/* HRM Log block */}
           <div className="rounded-xl md-surface-high px-4 py-3 space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)]">{LABELS.HRM_LOG}</p>
             <LogPanel logs={hrmLogs} />
@@ -530,43 +439,11 @@ export default function LogForm({ onNotify }: LogFormProps) {
       {/* Actions card */}
       <div className="rounded-2xl md-surface px-5 py-4 space-y-3">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)]">{LABELS.ACTIONS}</p>
-        {stagedTickets.length > 0 && logDates.length > 0 && (
-          <div data-testid="will-log-summary" className="rounded-xl border border-[var(--md-outline-variant)] border-l-4 border-l-[var(--md-primary)] bg-[var(--md-surface-container-high)] px-4 py-3 text-sm space-y-3">
-            {/* Tickets section */}
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)] mb-1.5">{LABELS.TICKETS}</p>
-              <ul className="space-y-1">
-                {stagedTickets.map((t, i) => {
-                  const slots = getTimeSlots(stagedTickets.length, i);
-                  const timeStr = slots.map((s) => `${s.start}–${s.end}`).join(" / ");
-                  return (
-                    <li key={t.ticket} className="flex items-center gap-2">
-                      <span className="font-medium text-[var(--md-on-surface)]">{t.ticket}</span>
-                      <span className="text-[var(--md-on-surface-variant)] text-xs">{timeStr}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-
-            <div className="border-t border-[var(--md-outline-variant)]" />
-
-            {/* Dates section */}
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--md-on-surface-variant)] mb-1.5">{LABELS.DATES}</p>
-              <ul className="space-y-1">
-                {logDates.map((d) => (
-                  <li key={d} className="text-[var(--md-on-surface)]">{formatDateDisplay(d)}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
         <div className="flex flex-col gap-2.5">
           <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
-              disabled={stagedTickets.length === 0 || logDates.length === 0 || isLogging}
+              disabled={groups.length === 0 || isLogging}
               onClick={handleLogTsc}
               className="px-4 py-2.5 text-sm md-btn-tonal active:scale-95 transition-transform duration-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -574,16 +451,16 @@ export default function LogForm({ onNotify }: LogFormProps) {
             </button>
             <button
               type="button"
-              disabled={stagedTickets.length === 0 || isLogging}
+              disabled={groups.length === 0 || isLogging}
               onClick={handleLogHrm}
               className="px-4 py-2.5 text-sm md-btn-tonal active:scale-95 transition-transform duration-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Log HRM ({stagedTickets.length})
+              {LABELS.LOG_HRM} ({validCount})
             </button>
           </div>
           <button
             type="button"
-            disabled={stagedTickets.length === 0 || isLogging}
+            disabled={groups.length === 0 || isLogging}
             onClick={handleLogAll}
             className="w-full px-4 py-3 text-sm md-btn-accent active:scale-95 transition-transform duration-100 disabled:cursor-not-allowed disabled:opacity-50"
           >

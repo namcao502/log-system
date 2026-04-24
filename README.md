@@ -4,10 +4,11 @@ A personal productivity tool that automates logging Jira tickets (MDP-xxxx) to a
 
 ## What It Does
 
-1. Enter one or more Jira ticket IDs (e.g. `MDP-1234, MDP-5678`)
-2. Verify they exist in Jira
-3. Select one or more dates
-4. Log to SharePoint Excel, HRM, or both in one click
+1. Add rows to the entry table -- each row is one (date, ticket) pair
+2. Type a ticket number (e.g. `1234`) -- auto-prefixed to `MDP-1234`; Jira verifies it on blur
+3. Different tickets on different dates can be set up in a single session (e.g. Monday: MDP-1234, Tuesday: MDP-5678)
+4. Same-date rows are automatically combined into one log entry
+5. Click **Log TSC**, **Log HRM**, or **Log All** to write to SharePoint Excel, HRM, or both in parallel
 
 ## Tech Stack
 
@@ -83,7 +84,8 @@ lib/
   useTheme.ts                 # Hook: CSS variable theme system with localStorage persistence
 components/
   AppShell.tsx                # Client shell - wires notifications, toasts, theme, renders header + LogForm
-  LogForm.tsx                 # Main client component - all state and log orchestration
+  LogForm.tsx                 # Main client component - rows: LogRow[] state, groupByDate, log orchestration
+  LogRowItem.tsx              # Single entry row - DatePickerPopover + ticket input + StatusBadge + remove
   LogPanel.tsx                # Scrollable dark-terminal pre block for streaming log lines
   DatePickerPopover.tsx       # Calendar popover (react-day-picker) with hidden <input type="date">
   NotificationBell.tsx        # Bell icon with unread badge and dropdown
@@ -92,6 +94,7 @@ components/
   ToastContainer.tsx          # Fixed top-right stack of active toasts
 __tests__/
   LogForm.test.tsx
+  LogRowItem.test.tsx
   LogPanel.test.tsx
   NotificationBell.test.tsx
   Toast.test.tsx
@@ -122,9 +125,9 @@ The UI uses a Material You (MD3) dark scheme driven by a single CSS custom prope
 
 ## Notes
 
-- Max 5 staged tickets at a time
-- Ticket format: `MDP-\d+`
+- Ticket format: `MDP-\d+` -- auto-prefixed as you type; no need to type "MDP-"
+- Each row is verified individually on blur; already-verified rows skip re-verification
+- Same-date rows are grouped and logged in one combined API call per destination
 - Dates stored as `YYYY-MM-DD`, displayed via `Intl.DateTimeFormat`
 - Timezone: Asia/Ho_Chi_Minh
-- Jira verify status clears after 20 s; log status clears after 10 s
 - Browser channel: Chrome (both TSC and HRM Playwright sessions)

@@ -69,7 +69,13 @@ async function ensureAuthenticated(
   if (!onHrm()) {
     emit(`[hrm-log] [${elapsed()}] Session expired -- please log in in the browser window that just opened...`);
     try {
-      await page.waitForURL((url) => url.hostname === "hrm.nois.vn", { timeout: 120_000 });
+      await page.waitForURL(
+        (url) =>
+          url.hostname === "hrm.nois.vn" &&
+          !url.pathname.toLowerCase().includes("login") &&
+          !url.pathname.toLowerCase().includes("auth"),
+        { timeout: 120_000 },
+      );
     } catch {
       return "Timed out waiting for HRM login. Please log in within 2 minutes and try again.";
     }
